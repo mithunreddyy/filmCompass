@@ -1,4 +1,5 @@
 import { cache, CACHE_TTL } from "@/lib/cache";
+import { getServerEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
 type RedisClient = {
@@ -18,8 +19,9 @@ async function getRedisClient(): Promise<RedisClient | null> {
   if (redisInitAttempted) return redisClient;
   redisInitAttempted = true;
 
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const env = getServerEnv();
+  const url = env.UPSTASH_REDIS_REST_URL;
+  const token = env.UPSTASH_REDIS_REST_TOKEN;
 
   if (!url || !token) return null;
 

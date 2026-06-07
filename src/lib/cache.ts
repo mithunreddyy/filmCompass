@@ -1,6 +1,6 @@
 // ============================================
-// In-Memory Cache with TTL
-// Ready to be swapped for Redis/Supabase later
+// In-Memory Cache with TTL (dev / fallback)
+// Production reads/writes go through redis-cache.ts
 // ============================================
 
 interface CacheEntry<T> {
@@ -61,5 +61,6 @@ export const CACHE_TTL = {
   MOVIE_DETAIL: 3600, // 1 hour
   TRENDING: 600, // 10 minutes
   DISCOVER: 300, // 5 minutes
+  CATALOGUE: 21600, // 6 hours — full Telugu decade crawl
   GENRES: 86400, // 24 hours
 } as const;

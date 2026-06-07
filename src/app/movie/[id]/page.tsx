@@ -1,9 +1,12 @@
 import { getMovieDetail } from "@/services/tmdb";
+import { getOMDbByImdbId } from "@/services/omdb";
 import { MovieDetailContent } from "./movie-detail-content";
 import { MovieJsonLd } from "@/components/movies/movie-json-ld";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { clientEnv } from "@/lib/env";
+
+export const revalidate = 3600;
 
 interface MoviePageProps {
   params: Promise<{ id: string }>;
@@ -49,11 +52,15 @@ export default async function MovieDetailPage({ params }: MoviePageProps) {
     notFound();
   }
 
+  const omdb = movie.imdbId
+    ? await getOMDbByImdbId(movie.imdbId).catch(() => null)
+    : null;
+
   const url = `${clientEnv.NEXT_PUBLIC_APP_URL}/movie/${movieId}`;
   return (
     <>
       <MovieJsonLd movie={movie} url={url} />
-      <MovieDetailContent movie={movie} />
+      <MovieDetailContent movie={movie} omdb={omdb} />
     </>
   );
 }

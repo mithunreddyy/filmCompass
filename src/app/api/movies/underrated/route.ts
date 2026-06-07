@@ -4,7 +4,8 @@ import {
   getHiddenGemsByCategory,
 } from "@/services/underrated";
 import { underratedParamsSchema } from "@/schemas/recommendations";
-import { toErrorResponse } from "@/lib/errors";
+import { apiError, apiSuccess } from "@/lib/api-route";
+import { ValidationError } from "@/lib/errors";
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,10 +17,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!parsed.success) {
-      return Response.json(
-        { success: false, error: "Invalid parameters" },
-        { status: 400 }
-      );
+      throw new ValidationError("Invalid parameters");
     }
 
     const { page, language, category } = parsed.data;
@@ -28,14 +26,13 @@ export async function GET(request: NextRequest) {
       ? await getHiddenGemsByCategory(category, page)
       : await getUnderratedMovies(page, language);
 
-    return Response.json({
-      success: true,
+    return apiSuccess({
       data: result.movies,
       page: result.page,
       totalPages: result.totalPages,
       totalResults: result.totalResults,
     });
   } catch (error) {
-    return Response.json(toErrorResponse(error), { status: 500 });
+    return apiError(error, "Underrated API");
   }
 }

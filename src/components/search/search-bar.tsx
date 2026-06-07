@@ -10,7 +10,7 @@ import { useSearchStore } from "@/store/search-store";
 import { cn } from "@/lib/utils";
 
 interface SearchBarProps {
-  variant?: "default" | "hero";
+  variant?: "default" | "hero" | "compact";
 }
 
 export function SearchBar({ variant = "default" }: SearchBarProps) {
@@ -27,6 +27,7 @@ export function SearchBar({ variant = "default" }: SearchBarProps) {
   const { data, isLoading } = useMovieSearch(localQuery);
 
   const results = data?.data ?? [];
+  const listboxId = "search-suggestions";
   const showDropdown =
     isOpen && (localQuery.length >= 2 || recentSearches.length > 0);
 
@@ -84,19 +85,20 @@ export function SearchBar({ variant = "default" }: SearchBarProps) {
     }
   }
 
+  const isCompact = variant === "compact";
+
   return (
-    <div
-      ref={containerRef}
-      className={cn("relative w-full", variant === "hero" ? "max-w-lg" : "max-w-xl")}
-    >
+    <div ref={containerRef} className="relative w-full">
       <div
         className={cn(
-          "flex items-center gap-3 rounded-2xl transition-all duration-300 liquid-glass-subtle",
-          variant === "hero" ? "px-5 py-3.5" : "rounded-full px-4 py-2.5",
-          isOpen && "ring-1 ring-ring/30"
+          "flex items-center gap-2 rounded fc-input transition-shadow",
+          isCompact ? "rounded-full px-3 py-1.5" : variant === "hero" ? "px-4 py-3" : "px-3 py-2",
+          isOpen && "ring-1 ring-brand-violet/40"
         )}
       >
-        <Search size={variant === "hero" ? 18 : 16} className="text-muted-foreground shrink-0" />
+        <Search
+          className={cn("shrink-0 text-muted-foreground", isCompact ? "h-3.5 w-3.5" : "h-4 w-4")}
+        />
         <input
           ref={inputRef}
           type="text"
@@ -107,12 +109,16 @@ export function SearchBar({ variant = "default" }: SearchBarProps) {
           }}
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Search films, actors, directors..."
+          placeholder="Search films..."
           className={cn(
-            "flex-1 bg-transparent text-foreground placeholder-muted-foreground outline-none",
-            variant === "hero" ? "text-base" : "text-sm"
+            "flex-1 bg-transparent text-foreground placeholder:text-muted-foreground outline-none",
+            isCompact ? "text-sm" : "text-sm sm:text-base"
           )}
-          aria-label="Search movies"
+          aria-label="Search films"
+          aria-expanded={showDropdown}
+          aria-controls={showDropdown ? listboxId : undefined}
+          aria-autocomplete="list"
+          role="combobox"
           autoComplete="off"
         />
         {localQuery && (
@@ -121,36 +127,31 @@ export function SearchBar({ variant = "default" }: SearchBarProps) {
               setLocalQuery("");
               inputRef.current?.focus();
             }}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Clear search"
+            className="text-muted-foreground hover:text-foreground"
+            aria-label="Clear"
           >
-            <X size={14} />
+            <X className="h-3.5 w-3.5" />
           </button>
         )}
-        <kbd className="hidden sm:inline-flex items-center rounded-md border border-border/40 bg-muted/30 px-1.5 py-0.5 text-[10px] text-muted-foreground">
-          /
-        </kbd>
       </div>
 
       <AnimatePresence>
         {showDropdown && (
           <motion.div
-            initial={{ opacity: 0, y: -8, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.98 }}
-            transition={{ duration: 0.2 }}
-            className="absolute top-full left-0 right-0 z-50 mt-2 overflow-hidden rounded-2xl liquid-glass shadow-2xl"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="absolute top-full left-0 right-0 z-50 mt-1.5 overflow-hidden rounded-xl border border-border/80 bg-surface/95 shadow-xl backdrop-blur-xl"
           >
             {localQuery.length < 2 && recentSearches.length > 0 && (
-              <div className="p-3">
-                <div className="mb-2 flex items-center justify-between px-1">
-                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                    <Clock size={12} />
+              <div className="p-2">
+                <div className="mb-1 flex items-center justify-between px-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Recent
                   </span>
                   <button
                     onClick={clearRecentSearches}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-[11px] text-brand-violet"
                   >
                     Clear
                   </button>
@@ -162,9 +163,9 @@ export function SearchBar({ variant = "default" }: SearchBarProps) {
                       setLocalQuery(search);
                       handleSubmit(search);
                     }}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground hover:bg-foreground/5 transition-colors"
+                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-surface-raised"
                   >
-                    <Clock size={12} className="text-muted-foreground" />
+                    <Clock className="h-3 w-3 text-muted-foreground" />
                     {search}
                   </button>
                 ))}
@@ -172,68 +173,65 @@ export function SearchBar({ variant = "default" }: SearchBarProps) {
             )}
 
             {isLoading && localQuery.length >= 2 && (
-              <div className="p-6 text-center">
-                <div className="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-foreground/20 border-t-foreground/70" />
+              <div className="p-4 text-center">
+                <div className="mx-auto h-4 w-4 animate-spin rounded-full border-2 border-muted border-t-brand-violet" />
               </div>
             )}
 
             {!isLoading && results.length > 0 && (
-              <div className="max-h-[400px] overflow-y-auto p-2">
+              <div
+                id={listboxId}
+                role="listbox"
+                aria-label="Search suggestions"
+                className="max-h-72 overflow-y-auto p-1"
+              >
                 {results.slice(0, 8).map((movie, i) => (
                   <button
                     key={movie.id}
+                    role="option"
+                    aria-selected={selectedIndex === i}
                     onClick={() => {
                       addRecentSearch(movie.title);
                       setIsOpen(false);
                       router.push(`/movie/${movie.id}`);
                     }}
                     className={cn(
-                      "flex w-full items-center gap-3 rounded-xl px-3 py-2 transition-colors",
-                      selectedIndex === i
-                        ? "bg-foreground/8 text-foreground"
-                        : "hover:bg-foreground/5"
+                      "flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left",
+                      selectedIndex === i ? "bg-surface-raised" : "hover:bg-surface-raised"
                     )}
                   >
                     {movie.posterUrl ? (
                       <Image
                         src={movie.posterUrl}
                         alt={movie.title}
-                        width={36}
-                        height={54}
-                        className="rounded-md object-cover"
+                        width={32}
+                        height={48}
+                        className="rounded-sm object-cover"
                       />
                     ) : (
-                      <div className="h-[54px] w-[36px] rounded-md bg-muted/30" />
+                      <div className="h-12 w-8 rounded-sm bg-muted" />
                     )}
-                    <div className="flex-1 text-left min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {movie.title}
-                      </p>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{movie.title}</p>
                       <p className="text-xs text-muted-foreground">
-                        {movie.year > 0 ? movie.year : "Unknown"} ·{" "}
-                        {movie.rating > 0
-                          ? `★ ${movie.rating.toFixed(1)}`
-                          : "Unrated"}
+                        {movie.year > 0 ? movie.year : "—"}
+                        {movie.rating > 0 && ` · ${movie.rating.toFixed(1)}`}
                       </p>
                     </div>
-                    <ArrowRight size={14} className="text-muted-foreground shrink-0" />
                   </button>
                 ))}
-
                 <button
                   onClick={() => handleSubmit(localQuery)}
-                  className="mt-1 flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors"
+                  className="mt-1 flex w-full items-center justify-center gap-1 py-2 text-xs font-semibold text-brand-violet hover:bg-surface-raised"
                 >
-                  View all results for &quot;{localQuery}&quot;
-                  <ArrowRight size={14} />
+                  All results for &quot;{localQuery}&quot;
+                  <ArrowRight className="h-3 w-3" />
                 </button>
               </div>
             )}
 
             {!isLoading && localQuery.length >= 2 && results.length === 0 && (
-              <div className="p-6 text-center text-sm text-muted-foreground">
-                No movies found for &quot;{localQuery}&quot;
-              </div>
+              <p className="p-4 text-center text-sm text-muted-foreground">No films found</p>
             )}
           </motion.div>
         )}

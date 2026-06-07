@@ -1,25 +1,53 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Bot, Send, Sparkles, Loader2 } from "lucide-react";
+import { Bot, Dices, Send, Sparkles, User, Wand2 } from "lucide-react";
 import type { Movie } from "@/types/movie";
 import { cn } from "@/lib/utils";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
   movies?: Movie[];
+  provider?: string | null;
 }
 
+type AssistantAction = "chat" | "random-gem" | "recommend";
+
+const QUICK_ACTIONS: {
+  label: string;
+  action: AssistantAction;
+  message?: string;
+  icon: typeof Dices;
+}[] = [
+  {
+    label: "Random Telugu gem",
+    action: "random-gem",
+    icon: Dices,
+  },
+  {
+    label: "Recommend for tonight",
+    action: "recommend",
+    message: "something great to watch tonight",
+    icon: Wand2,
+  },
+  {
+    label: "Underrated Telugu thrillers",
+    action: "chat",
+    message: "Recommend underrated Telugu thriller films",
+    icon: Sparkles,
+  },
+];
+
 const SUGGESTIONS = [
-  "Recommend mind-bending thrillers",
-  "Movies like Interstellar",
-  "Underrated Telugu films",
-  "Dark psychological dramas after 2015",
-  "Movies similar to Memories of Murder",
+  "Movies like Baahubali but smaller scale",
+  "Telugu hidden gems from the 2010s",
+  "Feel-good Telugu family films",
+  "Dark psychological Telugu dramas",
 ];
 
 export function AssistantContent() {
@@ -27,7 +55,7 @@ export function AssistantContent() {
     {
       role: "assistant",
       content:
-        "Hi! I'm your FilmCompass AI assistant. Ask me for movie recommendations, hidden gems, or films similar to your favorites.",
+        "Hi! I'm FilmCompass AI — powered by open-source models (Ollama/Groq) when configured. Ask for recommendations, hit **Random Telugu gem**, or tell me your mood.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -35,8 +63,55 @@ export function AssistantContent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [messages, isLoading]);
+
+  const sendRequest = useCallback(
+    async (payload: { message?: string; action?: AssistantAction }) => {
+      setIsLoading(true);
+      try {
+        const res = await fetch("/api/assistant", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        const data = (await res.json()) as {
+          success: boolean;
+          data?: { reply: string; movies: Movie[]; provider?: string | null };
+          error?: string;
+        };
+
+        if (data.success && data.data) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: data.data!.reply,
+              movies: data.data!.movies,
+              provider: data.data!.provider,
+            },
+          ]);
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: data.error ?? "Sorry, I couldn't process that request.",
+            },
+          ]);
+        }
+      } catch {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: "Something went wrong. Please try again." },
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,110 +120,106 @@ export function AssistantContent() {
 
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
-    setIsLoading(true);
+    await sendRequest({ message: trimmed, action: "chat" });
+  }
 
-    try {
-      const res = await fetch("/api/assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed }),
-      });
+  async function handleQuickAction(action: (typeof QUICK_ACTIONS)[number]) {
+    if (isLoading) return;
 
-      const data = (await res.json()) as {
-        success: boolean;
-        data?: { reply: string; movies: Movie[] };
-        error?: string;
-      };
+    const userLabel =
+      action.action === "random-gem"
+        ? "Surprise me with a random Telugu hidden gem"
+        : action.label;
 
-      if (data.success && data.data) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content: data.data!.reply,
-            movies: data.data!.movies,
-          },
-        ]);
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content: data.error ?? "Sorry, I couldn't process that request.",
-          },
-        ]);
-      }
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "Something went wrong. Please try again.",
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
+    setMessages((prev) => [...prev, { role: "user", content: userLabel }]);
+    await sendRequest({
+      action: action.action,
+      message: action.message,
+    });
   }
 
   return (
-    <div className="pt-28 pb-16 min-h-[calc(100vh-4rem)]">
-      <div className="mx-auto max-w-3xl px-4 md:px-6 flex flex-col h-full">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6 text-center"
-        >
-          <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-amber-500/10 mb-4">
-            <Bot size={24} className="text-amber-500" />
-          </div>
-          <h1 className="font-heading text-2xl font-bold text-foreground md:text-3xl">
-            AI Movie Assistant
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Ask for recommendations powered by real movie data
-          </p>
-        </motion.div>
+    <PageShell className="flex min-h-[calc(100vh-7rem)] max-w-3xl flex-col !py-4">
+      <PageHeader
+        kicker="FilmCompass AI"
+        title="Assistant"
+        description="Open-source AI recommendations + live TMDb catalogue"
+      />
 
-        {/* Suggestions */}
-        {messages.length <= 1 && (
-          <div className="mb-6 flex flex-wrap justify-center gap-2">
-            {SUGGESTIONS.map((suggestion) => (
-              <button
-                key={suggestion}
-                onClick={() => setInput(suggestion)}
-                className="flex items-center gap-1.5 rounded-full border border-border/30 bg-card/30 px-3 py-1.5 text-xs text-muted-foreground transition-all hover:border-amber-500/30 hover:text-amber-500"
-              >
-                <Sparkles size={10} />
-                {suggestion}
-              </button>
-            ))}
-          </div>
-        )}
+      <div className="mb-4 flex flex-wrap gap-2">
+        {QUICK_ACTIONS.map((action) => (
+          <button
+            key={action.label}
+            type="button"
+            onClick={() => handleQuickAction(action)}
+            disabled={isLoading}
+            className="fc-chip gap-1.5"
+          >
+            <action.icon size={13} className="shrink-0 text-brand-violet" />
+            {action.label}
+          </button>
+        ))}
+      </div>
 
-        {/* Messages */}
-        <div className="flex-1 space-y-4 mb-6 max-h-[50vh] overflow-y-auto">
-          {messages.map((msg, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
+      {messages.length <= 1 && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {SUGGESTIONS.map((suggestion) => (
+            <button
+              key={suggestion}
+              type="button"
+              onClick={() => setInput(suggestion)}
+              className="fc-chip gap-1.5 text-left text-xs"
+            >
+              <Sparkles size={11} className="shrink-0 text-brand-mint" />
+              {suggestion}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div
+        className="mb-4 flex-1 space-y-4 overflow-y-auto rounded-2xl border border-border/50 bg-surface/40 p-3 sm:p-4"
+        aria-live="polite"
+        aria-relevant="additions"
+      >
+        {messages.map((msg, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={cn("flex gap-2.5", msg.role === "user" ? "flex-row-reverse" : "flex-row")}
+          >
+            <div
               className={cn(
-                "flex",
-                msg.role === "user" ? "justify-end" : "justify-start"
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl",
+                msg.role === "user"
+                  ? "bg-brand-violet/15 text-brand-violet"
+                  : "bg-brand-mint/10 text-brand-mint"
+              )}
+              aria-hidden
+            >
+              {msg.role === "user" ? (
+                <User size={16} strokeWidth={2} />
+              ) : (
+                <Bot size={16} strokeWidth={2} />
+              )}
+            </div>
+            <div
+              className={cn(
+                "max-w-[82%] min-w-0",
+                msg.role === "user" ? "items-end" : "items-start"
               )}
             >
-              <div
-                className={cn(
-                  "max-w-[85%] rounded-2xl px-4 py-3 text-sm",
-                  msg.role === "user"
-                    ? "bg-amber-500 text-black font-medium"
-                    : "border border-border/30 bg-card/50 text-foreground"
-                )}
-              >
-                <p className="leading-relaxed whitespace-pre-wrap">
-                  {msg.content}
+              <div className={msg.role === "user" ? "fc-chat-user" : "fc-chat-assistant"}>
+                <p className="whitespace-pre-wrap leading-relaxed">
+                  {msg.content.replace(/\*\*/g, "")}
                 </p>
+
+                {msg.provider && msg.role === "assistant" && (
+                  <p className="mt-2 text-[10px] capitalize text-muted-foreground">
+                    via {msg.provider}
+                  </p>
+                )}
 
                 {msg.movies && msg.movies.length > 0 && (
                   <div className="mt-3 grid gap-2">
@@ -156,24 +227,24 @@ export function AssistantContent() {
                       <Link
                         key={movie.id}
                         href={`/movie/${movie.id}`}
-                        className="flex items-center gap-3 rounded-xl bg-background/50 p-2 transition-colors hover:bg-background/80"
+                        className="group flex items-center gap-3 rounded-xl border border-border/60 bg-surface/80 p-2.5 transition-all hover:border-brand-violet/40 hover:shadow-sm"
                       >
                         {movie.posterUrl ? (
                           <Image
                             src={movie.posterUrl}
                             alt={movie.title}
-                            width={32}
-                            height={48}
-                            className="rounded object-cover"
+                            width={36}
+                            height={54}
+                            className="rounded-md object-cover shadow-sm"
                           />
                         ) : (
-                          <div className="h-12 w-8 rounded bg-muted/30" />
+                          <div className="h-[54px] w-9 rounded-md bg-muted/30" />
                         )}
                         <div className="min-w-0">
-                          <p className="font-medium text-foreground truncate text-xs">
+                          <p className="truncate text-sm font-medium text-foreground group-hover:text-brand-violet">
                             {movie.title}
                           </p>
-                          <p className="text-[10px] text-muted-foreground">
+                          <p className="text-xs text-muted-foreground">
                             {movie.year > 0 ? movie.year : "Unknown"} · ★{" "}
                             {movie.rating.toFixed(1)}
                           </p>
@@ -183,41 +254,54 @@ export function AssistantContent() {
                   </div>
                 )}
               </div>
-            </motion.div>
-          ))}
-
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="rounded-2xl border border-border/30 bg-card/50 px-4 py-3">
-                <Loader2 size={16} className="animate-spin text-amber-500" />
-              </div>
             </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+          </motion.div>
+        ))}
 
-        {/* Input */}
-        <form onSubmit={handleSubmit} className="sticky bottom-4">
-          <div className="flex items-center gap-2 rounded-2xl border border-border/50 bg-card/80 px-4 py-3 backdrop-blur-xl shadow-lg">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about movies..."
-              className="flex-1 bg-transparent text-sm text-foreground placeholder-muted-foreground outline-none"
-              disabled={isLoading}
-            />
-            <button
-              type="submit"
-              disabled={!input.trim() || isLoading}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500 text-black transition-all hover:bg-amber-400 disabled:opacity-50"
-              aria-label="Send message"
-            >
-              <Send size={16} />
-            </button>
+        {isLoading && (
+          <div className="flex gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-mint/10 text-brand-mint">
+              <Bot size={16} />
+            </div>
+            <div className="fc-chat-assistant flex items-center gap-2">
+              <span className="flex gap-1">
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-violet [animation-delay:0ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-violet [animation-delay:150ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-violet [animation-delay:300ms]" />
+              </span>
+            </div>
           </div>
-        </form>
+        )}
+        <div ref={messagesEndRef} />
       </div>
-    </div>
+
+      <form
+        onSubmit={handleSubmit}
+        className="sticky z-10"
+        style={{
+          bottom:
+            "calc(var(--dock-offset) + var(--dock-gap) + env(safe-area-inset-bottom, 0px) + 0.5rem)",
+        }}
+      >
+        <div className="fc-glass flex items-center gap-2 px-3 py-2.5 sm:px-4 sm:py-3">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask about films, genres, or hidden gems…"
+            className="min-h-10 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+            disabled={isLoading}
+          />
+          <button
+            type="submit"
+            disabled={!input.trim() || isLoading}
+            className="fc-btn-primary !min-h-10 !min-w-10 !rounded-xl !p-0"
+            aria-label="Send message"
+          >
+            <Send size={16} />
+          </button>
+        </div>
+      </form>
+    </PageShell>
   );
 }

@@ -8,8 +8,9 @@ export const recommendationInputSchema = z.object({
 });
 
 export const assistantInputSchema = z.object({
-  message: z.string().min(1).max(1000),
+  message: z.string().max(1000).optional(),
   movieId: z.number().int().positive().optional(),
+  action: z.enum(["chat", "random-gem", "recommend"]).optional(),
 });
 
 export const underratedParamsSchema = z.object({

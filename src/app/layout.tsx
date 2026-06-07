@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
-import { Inter, Syne } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { DM_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { Header } from "@/components/layout/header";
@@ -7,16 +7,10 @@ import { NavDock } from "@/components/layout/nav-dock";
 import { Toaster } from "sonner";
 import "./globals.css";
 
-const inter = Inter({
+const dmSans = DM_Sans({
   subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-const syne = Syne({
-  subsets: ["latin"],
-  weight: ["600", "700", "800"],
-  variable: "--font-display",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-sans",
   display: "swap",
 });
 
@@ -26,17 +20,7 @@ export const metadata: Metadata = {
     template: "%s | FilmCompass",
   },
   description:
-    "A modern movie discovery platform with intelligent recommendations, hidden gems, trending films, and advanced search. Explore cinema from around the world.",
-  keywords: [
-    "movies",
-    "film discovery",
-    "movie recommendations",
-    "hidden gems",
-    "trending movies",
-    "cinema",
-    "film database",
-  ],
-  authors: [{ name: "FilmCompass" }],
+    "A modern movie discovery platform with intelligent recommendations, hidden gems, trending films, and advanced search.",
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -45,39 +29,49 @@ export const metadata: Metadata = {
     description:
       "A modern movie discovery platform with intelligent recommendations, hidden gems, and advanced search.",
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "FilmCompass — Discover Your Next Favorite Film",
-    description:
-      "A modern movie discovery platform with intelligent recommendations.",
-  },
-  robots: {
-    index: true,
-    follow: true,
-  },
+  robots: { index: true, follow: true },
+};
+
+export const viewport: Viewport = {
+  viewportFit: "cover",
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f2f3f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#090b10" },
+  ],
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${syne.variable} h-full`}
+      className={`${dmSans.variable} h-full`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col antialiased mesh-gradient">
+      <body className="min-h-full bg-background text-foreground font-sans antialiased">
+        <div className="fc-ambient" aria-hidden />
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-xl focus:bg-brand-violet focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white focus:shadow-lg"
+        >
+          Skip to content
+        </a>
         <ThemeProvider>
           <QueryProvider>
-            <Header />
-            <main className="flex-1 safe-dock-pb">{children}</main>
-            <NavDock />
+            <div className="fc-app-shell">
+              <Header />
+              <main id="main-content" className="flex-1 safe-dock-pb">
+                {children}
+              </main>
+              <NavDock />
+            </div>
             <Toaster
               position="top-center"
               toastOptions={{
-                className: "liquid-glass",
+                className: "fc-glass !border-border/80 !text-foreground",
               }}
             />
           </QueryProvider>

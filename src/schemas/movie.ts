@@ -26,7 +26,10 @@ export const discoverParamsSchema = z.object({
   yearTo: z.coerce.number().int().min(1900).max(2030).optional(),
   ratingMin: z.coerce.number().min(0).max(10).default(0),
   ratingMax: z.coerce.number().min(0).max(10).default(10),
-  language: z.string().min(2).max(5).optional(),
+  language: z
+    .string()
+    .optional()
+    .transform((v) => (v === "all" || v === "" ? undefined : v ?? "te")),
   sortBy: z
     .enum([
       "popularity.desc",

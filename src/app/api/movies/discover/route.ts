@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { discoverMovies } from "@/services/tmdb";
 import { discoverParamsSchema } from "@/schemas/movie";
+import { apiError, apiSuccess } from "@/lib/api-route";
+import { ValidationError } from "@/lib/errors";
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,30 +19,18 @@ export async function GET(request: NextRequest) {
     });
 
     if (!parsed.success) {
-      return Response.json(
-        { success: false, error: "Invalid parameters" },
-        { status: 400 }
-      );
+      throw new ValidationError("Invalid parameters");
     }
 
     const result = await discoverMovies(parsed.data);
 
-    return Response.json({
-      success: true,
+    return apiSuccess({
       data: result.movies,
       page: result.page,
       totalPages: result.totalPages,
       totalResults: result.totalResults,
     });
   } catch (error) {
-    console.error("Discover error:", error);
-    return Response.json(
-      {
-        success: false,
-        error:
-          error instanceof Error ? error.message : "Failed to discover movies",
-      },
-      { status: 500 }
-    );
+    return apiError(error, "Discover API");
   }
 }

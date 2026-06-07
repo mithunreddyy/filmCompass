@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Bookmark, Share2, Users, ArrowRight } from "lucide-react";
+import { Bookmark, ArrowRight } from "lucide-react";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
+import { buildDiscoverUrl } from "@/lib/discover-params";
 
 interface Collection {
   slug: string;
@@ -17,94 +19,68 @@ interface CollectionsContentProps {
   collections: Collection[];
 }
 
-function buildDiscoverUrl(collection: Collection): string {
-  const params = new URLSearchParams();
-  if (collection.genres.length) {
-    params.set("genres", collection.genres.join(","));
-  }
-  if (collection.language) {
-    params.set("language", collection.language);
-  }
-  if (collection.ratingMin) {
-    params.set("ratingMin", String(collection.ratingMin));
-  }
-  params.set("sortBy", "vote_average.desc");
-  return `/discover?${params.toString()}`;
+function collectionDiscoverUrl(collection: Collection): string {
+  return buildDiscoverUrl({
+    genres: [...collection.genres],
+    language: collection.language,
+    ratingMin: collection.ratingMin,
+    sortBy: "vote_average.desc",
+  });
 }
 
 export function CollectionsContent({ collections }: CollectionsContentProps) {
   return (
-    <div className="pt-28 pb-16">
-      <div className="mx-auto max-w-7xl px-4 md:px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-12"
-        >
-          <h1 className="font-heading text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-            Collections
-          </h1>
-          <p className="mt-2 text-muted-foreground max-w-2xl">
-            Curated lists of films — from Telugu thrillers to Oscar snubs.
-            Create, share, and follow collections.
-          </p>
-        </motion.div>
+    <PageShell>
+      <PageHeader
+        kicker="Curated"
+        title="Lists"
+        description="Curated discover filters — jump into themed Telugu and world cinema collections."
+      />
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {collections.map((collection, i) => (
-            <motion.div
-              key={collection.slug}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        {collections.map((collection, i) => (
+          <motion.div
+            key={collection.slug}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.05 }}
+          >
+            <Link
+              href={collectionDiscoverUrl(collection)}
+              className="group fc-card-interactive flex h-full flex-col !p-6"
             >
-              <Link
-                href={buildDiscoverUrl(collection)}
-                className="group flex flex-col h-full rounded-2xl border border-border/30 bg-card/30 p-6 transition-all hover:border-amber-500/30 hover:bg-amber-500/5 hover:shadow-lg"
-              >
-                <div className="flex items-start justify-between">
-                  <Bookmark
-                    size={20}
-                    className="text-amber-500 shrink-0"
-                  />
-                  <ArrowRight
-                    size={16}
-                    className="text-muted-foreground opacity-0 transition-all group-hover:opacity-100 group-hover:text-amber-500"
-                  />
-                </div>
-                <h2 className="mt-4 font-heading text-lg font-semibold text-foreground group-hover:text-amber-500">
-                  {collection.title}
-                </h2>
-                <p className="mt-2 text-sm text-muted-foreground flex-1">
-                  {collection.description}
-                </p>
-                <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Share2 size={12} />
-                    Share
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Users size={12} />
-                    Follow
-                  </span>
-                </div>
-              </Link>
-            </motion.div>
-          ))}
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="mt-12 rounded-2xl border border-dashed border-border/50 p-8 text-center"
-        >
-          <p className="text-muted-foreground text-sm">
-            User-created collections coming soon. Sign in to create and share
-            your own curated lists.
-          </p>
-        </motion.div>
+              <div className="flex items-start justify-between">
+                <Bookmark size={18} className="shrink-0 text-brand-violet" />
+                <ArrowRight
+                  size={16}
+                  className="text-muted-foreground opacity-0 transition-all group-hover:opacity-100 group-hover:text-brand-violet"
+                />
+              </div>
+              <h2 className="mt-4 text-lg font-semibold text-foreground group-hover:text-brand-violet">
+                {collection.title}
+              </h2>
+              <p className="mt-2 flex-1 text-sm text-muted-foreground">
+                {collection.description}
+              </p>
+              <p className="mt-4 text-xs text-muted-foreground">
+                Opens in Discover with pre-set filters
+              </p>
+            </Link>
+          </motion.div>
+        ))}
       </div>
-    </div>
+
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3 }}
+        className="mt-10 fc-glass border-dashed p-8 text-center"
+      >
+        <p className="text-sm text-muted-foreground">
+          User-created lists coming soon. Sign in to create and share your own
+          curated collections.
+        </p>
+      </motion.div>
+    </PageShell>
   );
 }

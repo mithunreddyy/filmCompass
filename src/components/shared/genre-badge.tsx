@@ -18,13 +18,11 @@ export function GenreBadge({
     <Link
       href={`/genre/${slug}`}
       className={cn(
-        "inline-flex items-center rounded-full border font-medium transition-all duration-200",
-        size === "sm"
-          ? "px-3 py-1 text-xs"
-          : "px-4 py-1.5 text-sm",
+        "inline-flex items-center rounded border font-semibold transition-colors",
+        size === "sm" ? "px-2 py-0.5 text-[10px] sm:text-xs" : "px-3 py-1 text-xs sm:text-sm",
         isActive
-          ? "border-amber-500 bg-amber-500/10 text-amber-500"
-          : "border-border/50 bg-card/50 text-muted-foreground hover:border-amber-500/50 hover:text-amber-500 hover:bg-amber-500/5"
+          ? "border-brand-violet bg-brand-violet/10 text-brand-violet"
+          : "border-border bg-surface text-muted-foreground hover:border-brand-violet/40 hover:text-brand-violet"
       )}
     >
       {name}

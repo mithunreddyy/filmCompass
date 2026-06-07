@@ -2,27 +2,45 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { Star, Calendar } from "lucide-react";
 import type { Movie } from "@/types/movie";
 import { getGenreById } from "@/types/movie";
+import { RatingPill } from "./rating-pill";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+
+function formatReleaseDate(isoDate: string): string {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  if (!y || !m || !d) return isoDate;
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 interface MovieCardProps {
   movie: Movie;
   index?: number;
+  layout?: "carousel" | "grid";
   size?: "sm" | "md" | "lg";
+  showOverview?: boolean;
+  showReleaseDate?: boolean;
 }
 
-export function MovieCard({ movie, index = 0, size = "md" }: MovieCardProps) {
+export function MovieCard({
+  movie,
+  layout = "carousel",
+  size = "md",
+  showOverview = false,
+  showReleaseDate = false,
+}: MovieCardProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
 
-  const sizes = {
-    sm: "w-[130px] sm:w-[150px]",
-    md: "w-[150px] sm:w-[170px] md:w-[190px]",
-    lg: "w-[170px] sm:w-[200px] md:w-[220px]",
+  const carouselSizes = {
+    sm: "w-[100px] sm:w-[130px]",
+    md: "w-[110px] sm:w-[140px] md:w-[155px]",
+    lg: "w-[130px] sm:w-[160px] md:w-[175px]",
   };
 
   const genreNames = movie.genreIds
@@ -31,79 +49,75 @@ export function MovieCard({ movie, index = 0, size = "md" }: MovieCardProps) {
     .filter(Boolean);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.05, ease: "easeOut" }}
-      className={cn("group relative flex-shrink-0", sizes[size])}
+    <article
+      className={cn(
+        "group/poster flex-shrink-0",
+        layout === "carousel" ? carouselSizes[size] : "w-full"
+      )}
     >
-      <Link href={`/movie/${movie.id}`} className="block">
-        {/* Poster */}
-        <div className="relative aspect-[2/3] overflow-hidden rounded-xl liquid-glass-card transition-all duration-300 group-hover:shadow-lg">
+      <Link
+        href={`/movie/${movie.id}`}
+        className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-brand-violet/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      >
+        <div className="fc-poster">
           {movie.posterUrl && !imageError ? (
             <Image
               src={movie.posterUrl}
               alt={movie.title}
               fill
-              sizes="(max-width: 640px) 150px, (max-width: 768px) 180px, 200px"
+              sizes={
+                layout === "grid"
+                  ? "(max-width:640px) 33vw, (max-width:1024px) 20vw, 12vw"
+                  : "(max-width:640px) 110px, 155px"
+              }
               className={cn(
-                "object-cover transition-all duration-500 group-hover:scale-105",
+                "object-cover transition-opacity duration-300",
                 imageLoaded ? "opacity-100" : "opacity-0"
               )}
               onLoad={() => setImageLoaded(true)}
               onError={() => setImageError(true)}
             />
           ) : (
-            <div className="flex h-full items-center justify-center bg-muted/30 p-4">
-              <span className="text-center text-sm text-muted-foreground font-heading">
-                {movie.title}
-              </span>
+            <div className="flex h-full items-center justify-center p-2 text-center text-[11px] text-muted-foreground">
+              {movie.title}
             </div>
           )}
 
-          {/* Shimmer while loading */}
           {!imageLoaded && !imageError && movie.posterUrl && (
-            <div className="absolute inset-0 animate-pulse bg-muted/30" />
+            <div className="absolute inset-0 fc-shimmer bg-surface-raised" />
           )}
 
-          {/* Hover Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-            <div className="absolute bottom-0 left-0 right-0 p-3">
-              <p className="line-clamp-3 text-xs text-gray-300 leading-relaxed">
-                {movie.overview || "No overview available."}
+          {movie.rating > 0 && (
+            <div className="absolute bottom-1.5 left-1.5">
+              <RatingPill rating={movie.rating} />
+            </div>
+          )}
+
+          {showOverview && movie.overview && (
+            <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-background via-background/85 to-transparent p-2 opacity-0 transition-opacity duration-200 group-hover/poster:opacity-100 group-focus-visible/poster:opacity-100">
+              <p className="line-clamp-3 text-[10px] leading-snug text-muted-foreground">
+                {movie.overview}
               </p>
             </div>
-          </div>
-
-          {/* Rating Badge */}
-          {movie.rating > 0 && (
-            <div className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 backdrop-blur-sm">
-              <Star size={10} className="fill-foreground/80 text-foreground/80" />
-              <span className="text-[11px] font-semibold text-white">
-                {movie.rating.toFixed(1)}
-              </span>
-            </div>
           )}
         </div>
 
-        {/* Info */}
-        <div className="mt-2.5 px-0.5">
-          <h3 className="font-medium text-sm text-foreground line-clamp-1 transition-colors group-hover:text-muted-foreground">
+        <div className="mt-2 min-w-0">
+          <h3 className="truncate text-xs font-semibold text-foreground sm:text-sm group-hover/poster:text-brand-violet transition-colors">
             {movie.title}
           </h3>
-          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-            {movie.year > 0 && (
-              <span className="flex items-center gap-1">
-                <Calendar size={10} />
-                {movie.year}
-              </span>
+          <p className="mt-0.5 truncate text-[11px] text-muted-foreground sm:text-xs">
+            {showReleaseDate && movie.releaseDate ? (
+              <span className="text-brand-mint">{formatReleaseDate(movie.releaseDate)}</span>
+            ) : (
+              movie.year > 0 ? movie.year : "—"
             )}
             {genreNames.length > 0 && (
-              <span className="truncate">{genreNames.join(" · ")}</span>
+              <span className="hidden sm:inline">{` · ${genreNames.join(" · ")}`}</span>
             )}
-          </div>
+          </p>
         </div>
       </Link>
-    </motion.div>
+    </article>
   );
 }

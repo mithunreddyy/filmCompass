@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Globe, Film, Calendar, ArrowRight } from "lucide-react";
+import { Globe, Calendar, ArrowRight } from "lucide-react";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
+import { SectionHeader } from "@/components/shared/section-header";
 
 interface Language {
   code: string;
@@ -42,109 +44,92 @@ const DECADES = [
 
 export function ExplorePageContent({ languages }: ExplorePageContentProps) {
   return (
-    <div className="pt-28 pb-16">
-      <div className="mx-auto max-w-7xl px-4 md:px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-12"
-        >
-          <h1 className="font-heading text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-            Global Movie Explorer
-          </h1>
-          <p className="mt-2 text-muted-foreground max-w-2xl">
-            Browse cinema by language, region, and decade. Discover films from
-            Telugu thrillers to Korean hidden gems.
-          </p>
-        </motion.div>
+    <PageShell className="space-y-6 sm:space-y-7">
+      <PageHeader
+        kicker="Browse"
+        title="Global Explorer"
+        description="Browse cinema by language, region, and decade — from Telugu thrillers to Korean hidden gems."
+      />
 
-        {/* Regions */}
-        <section className="mb-16">
-          <h2 className="font-heading text-xl font-semibold text-foreground mb-6 flex items-center gap-2">
-            <Globe size={20} className="text-amber-500" />
-            Browse by Region
-          </h2>
-          <div className="grid gap-4 md:grid-cols-3">
-            {REGIONS.map((region, i) => (
-              <motion.div
-                key={region.name}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="rounded-2xl border border-border/30 bg-card/30 p-6 backdrop-blur-sm"
-              >
-                <h3 className="font-heading text-lg font-semibold text-foreground">
+      <section>
+        <SectionHeader title="Browse by Region" />
+        <div className="grid gap-4 md:grid-cols-3">
+          {REGIONS.map((region, i) => (
+            <motion.div
+              key={region.name}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.08 }}
+              className="fc-card-interactive"
+            >
+              <div className="mb-3 flex items-center gap-2">
+                <Globe size={16} className="text-brand-violet" />
+                <h3 className="text-base font-semibold text-foreground">
                   {region.name}
                 </h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {region.description}
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {region.languages.map((code) => {
-                    const lang = languages.find((l) => l.code === code);
-                    if (!lang) return null;
-                    return (
-                      <Link
-                        key={code}
-                        href={`/discover?language=${code}&sortBy=vote_average.desc`}
-                        className="rounded-full border border-border/30 bg-background/50 px-3 py-1 text-xs font-medium text-muted-foreground transition-all hover:border-amber-500/30 hover:text-amber-500"
-                      >
-                        {lang.name}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </section>
+              </div>
+              <p className="text-sm text-muted-foreground">{region.description}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {region.languages.map((code) => {
+                  const lang = languages.find((l) => l.code === code);
+                  if (!lang) return null;
+                  return (
+                    <Link
+                      key={code}
+                      href={`/discover?language=${code}&sortBy=vote_average.desc`}
+                      className="fc-chip hover:text-brand-violet"
+                    >
+                      {lang.name}
+                    </Link>
+                  );
+                })}
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </section>
 
-        {/* All Languages */}
-        <section className="mb-16">
-          <h2 className="font-heading text-xl font-semibold text-foreground mb-6 flex items-center gap-2">
-            <Film size={20} className="text-amber-500" />
-            Browse by Language
-          </h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-            {languages.map((lang) => (
-              <Link
-                key={lang.code}
-                href={`/discover?language=${lang.code}`}
-                className="group flex items-center justify-between rounded-xl border border-border/30 bg-card/30 p-4 transition-all hover:border-amber-500/30 hover:bg-amber-500/5"
-              >
-                <span className="text-sm font-medium text-foreground group-hover:text-amber-500">
-                  {lang.name}
-                </span>
-                <ArrowRight
-                  size={14}
-                  className="text-muted-foreground opacity-0 transition-all group-hover:opacity-100 group-hover:text-amber-500"
-                />
-              </Link>
-            ))}
-          </div>
-        </section>
+      <section>
+        <SectionHeader title="Browse by Language" />
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+          {languages.map((lang) => (
+            <Link
+              key={lang.code}
+              href={`/discover?language=${lang.code}`}
+              className="group fc-card-interactive flex items-center justify-between !p-3"
+            >
+              <span className="text-sm font-medium text-foreground group-hover:text-brand-violet">
+                {lang.name}
+              </span>
+              <ArrowRight
+                size={14}
+                className="text-muted-foreground opacity-0 transition-all group-hover:opacity-100 group-hover:text-brand-violet"
+              />
+            </Link>
+          ))}
+        </div>
+      </section>
 
-        {/* Decades */}
-        <section>
-          <h2 className="font-heading text-xl font-semibold text-foreground mb-6 flex items-center gap-2">
-            <Calendar size={20} className="text-amber-500" />
-            Browse by Decade
-          </h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
-            {DECADES.map((decade) => (
-              <Link
-                key={decade.label}
-                href={`/discover?yearFrom=${decade.from}&yearTo=${decade.to}&sortBy=vote_average.desc`}
-                className="group rounded-xl border border-border/30 bg-card/30 p-5 text-center transition-all hover:border-amber-500/30 hover:bg-amber-500/5"
-              >
-                <span className="font-heading text-lg font-semibold text-foreground group-hover:text-amber-500">
-                  {decade.label}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      </div>
-    </div>
+      <section>
+        <SectionHeader title="Browse by Decade" />
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6">
+          {DECADES.map((decade) => (
+            <Link
+              key={decade.label}
+                href={`/discover?language=te&yearFrom=${decade.from}&yearTo=${decade.to}&sortBy=vote_average.desc`}
+              className="group fc-card-interactive text-center !p-4"
+            >
+              <Calendar
+                size={14}
+                className="mx-auto mb-2 text-brand-violet/60 group-hover:text-brand-violet"
+              />
+              <span className="text-sm font-semibold text-foreground group-hover:text-brand-violet">
+                {decade.label}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </section>
+    </PageShell>
   );
 }

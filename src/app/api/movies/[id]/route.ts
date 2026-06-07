@@ -1,5 +1,8 @@
 import { NextRequest } from "next/server";
 import { getMovieDetail } from "@/services/tmdb";
+import { movieIdSchema } from "@/schemas/movie";
+import { apiError, apiSuccess } from "@/lib/api-route";
+import { NotFoundError, ValidationError } from "@/lib/errors";
 
 export async function GET(
   _request: NextRequest,
@@ -7,30 +10,18 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const movieId = Number(id);
+    const parsed = movieIdSchema.safeParse({ id });
 
-    if (isNaN(movieId) || movieId <= 0) {
-      return Response.json(
-        { success: false, error: "Invalid movie ID" },
-        { status: 400 }
-      );
+    if (!parsed.success) {
+      throw new ValidationError("Invalid movie ID");
     }
 
-    const movie = await getMovieDetail(movieId);
-
-    return Response.json({
-      success: true,
-      data: movie,
-    });
+    const movie = await getMovieDetail(parsed.data.id);
+    return apiSuccess({ data: movie });
   } catch (error) {
-    console.error("Movie detail error:", error);
-    return Response.json(
-      {
-        success: false,
-        error:
-          error instanceof Error ? error.message : "Failed to fetch movie",
-      },
-      { status: 500 }
-    );
+    if (error instanceof NotFoundError) {
+      return apiError(error, "Movie detail API");
+    }
+    return apiError(error, "Movie detail API");
   }
 }

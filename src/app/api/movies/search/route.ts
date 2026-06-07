@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { searchMovies } from "@/services/tmdb";
 import { searchParamsSchema } from "@/schemas/movie";
+import { apiError, apiSuccess } from "@/lib/api-route";
+import { ValidationError } from "@/lib/errors";
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,30 +14,19 @@ export async function GET(request: NextRequest) {
     });
 
     if (!parsed.success) {
-      return Response.json(
-        { success: false, error: "Invalid search parameters" },
-        { status: 400 }
-      );
+      throw new ValidationError("Invalid search parameters");
     }
 
     const { query, page, year } = parsed.data;
     const result = await searchMovies(query, page, year);
 
-    return Response.json({
-      success: true,
+    return apiSuccess({
       data: result.movies,
       page: result.page,
       totalPages: result.totalPages,
       totalResults: result.totalResults,
     });
   } catch (error) {
-    console.error("Search error:", error);
-    return Response.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Search failed",
-      },
-      { status: 500 }
-    );
+    return apiError(error, "Search API");
   }
 }

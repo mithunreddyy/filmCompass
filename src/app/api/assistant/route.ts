@@ -1,25 +1,54 @@
 import { NextRequest } from "next/server";
-import { getAssistantResponse } from "@/services/recommendations";
+import {
+  getAssistantResponse,
+  getAssistantRecommendations,
+  getRandomHiddenGemResponse,
+} from "@/services/recommendations";
 import { assistantInputSchema } from "@/schemas/recommendations";
-import { toErrorResponse } from "@/lib/errors";
+import { apiError, apiSuccess } from "@/lib/api-route";
+import { enforceRateLimit } from "@/lib/rate-limit";
+import { ValidationError } from "@/lib/errors";
 
 export async function POST(request: NextRequest) {
   try {
+    enforceRateLimit(request, "assistant", {
+      limit: 20,
+      windowSeconds: 60 * 15,
+    });
+
     const body: unknown = await request.json();
     const parsed = assistantInputSchema.safeParse(body);
 
     if (!parsed.success) {
-      return Response.json(
-        { success: false, error: "Invalid assistant input" },
-        { status: 400 }
-      );
+      throw new ValidationError("Invalid assistant input");
     }
 
-    const { message, movieId } = parsed.data;
-    const result = await getAssistantResponse(message, { movieId });
+    const { message, movieId, action } = parsed.data;
 
-    return Response.json({ success: true, data: result });
+    if (action === "random-gem") {
+      const result = await getRandomHiddenGemResponse();
+      return apiSuccess({
+        data: {
+          reply: result.pitch,
+          movies: [result.movie],
+          provider: result.provider,
+        },
+      });
+    }
+
+    if (action === "recommend") {
+      const result = await getAssistantRecommendations(message ?? undefined);
+      return apiSuccess({ data: result });
+    }
+
+    if (!message?.trim()) {
+      throw new ValidationError("Message is required for chat");
+    }
+
+    const result = await getAssistantResponse(message.trim(), { movieId });
+
+    return apiSuccess({ data: result });
   } catch (error) {
-    return Response.json(toErrorResponse(error), { status: 500 });
+    return apiError(error, "Assistant API");
   }
 }

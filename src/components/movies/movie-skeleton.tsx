@@ -1,9 +1,9 @@
 export function MovieCardSkeleton() {
   return (
-    <div className="group relative flex-shrink-0 w-[180px] md:w-[200px]">
-      <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-muted/30 animate-pulse" />
-      <div className="mt-3 space-y-2">
-        <div className="h-4 w-3/4 rounded bg-muted/30 animate-pulse" />
+    <div className="w-full max-w-[155px] shrink-0">
+      <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-muted/30 animate-pulse" />
+      <div className="mt-2 space-y-1.5">
+        <div className="h-3.5 w-4/5 rounded bg-muted/30 animate-pulse" />
         <div className="h-3 w-1/2 rounded bg-muted/20 animate-pulse" />
       </div>
     </div>
@@ -12,7 +12,7 @@ export function MovieCardSkeleton() {
 
 export function MovieGridSkeleton({ count = 12 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+    <div className="grid grid-cols-3 gap-x-2 gap-y-4 sm:grid-cols-4 sm:gap-x-2.5 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8">
       {Array.from({ length: count }).map((_, i) => (
         <MovieCardSkeleton key={i} />
       ))}
@@ -22,9 +22,11 @@ export function MovieGridSkeleton({ count = 12 }: { count?: number }) {
 
 export function MovieCarouselSkeleton({ count = 7 }: { count?: number }) {
   return (
-    <div className="flex gap-4 overflow-hidden">
+    <div className="flex gap-2 overflow-hidden sm:gap-3">
       {Array.from({ length: count }).map((_, i) => (
-        <MovieCardSkeleton key={i} />
+        <div key={i} className="w-[110px] shrink-0 sm:w-[140px] md:w-[155px]">
+          <MovieCardSkeleton />
+        </div>
       ))}
     </div>
   );

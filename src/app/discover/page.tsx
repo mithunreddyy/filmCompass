@@ -1,10 +1,13 @@
 import { discoverMovies } from "@/services/tmdb";
+import { buildDiscoverUrl, parseDiscoverPageParams } from "@/lib/discover-params";
 import { DiscoverPageContent } from "./discover-page-content";
+
+export const revalidate = 300;
 
 export const metadata = {
   title: "Discover Movies",
   description:
-    "Discover new movies with advanced filters — by genre, language, year, rating, and more.",
+    "Discover Telugu cinema and films worldwide — filter by genre, language, year, and rating.",
 };
 
 interface DiscoverPageProps {
@@ -15,58 +18,61 @@ export default async function DiscoverPage({
   searchParams,
 }: DiscoverPageProps) {
   const resolvedParams = await searchParams;
+  const state = parseDiscoverPageParams(resolvedParams);
 
-  const genreStr =
-    typeof resolvedParams.genres === "string" ? resolvedParams.genres : "";
-  const genres = genreStr
-    ? genreStr
-        .split(",")
-        .map(Number)
-        .filter((n) => !isNaN(n))
-    : [];
-  const language =
-    typeof resolvedParams.language === "string"
-      ? resolvedParams.language
-      : undefined;
-  const sortBy =
-    typeof resolvedParams.sortBy === "string"
-      ? resolvedParams.sortBy
-      : "popularity.desc";
-  const ratingMin = Number(resolvedParams.ratingMin) || 0;
-  const yearFrom = Number(resolvedParams.yearFrom) || undefined;
-  const yearTo = Number(resolvedParams.yearTo) || undefined;
-  const page = Math.max(
-    1,
-    Number(
-      typeof resolvedParams.page === "string" ? resolvedParams.page : "1"
-    )
-  );
+  if (!state) {
+    return (
+      <DiscoverPageContent
+        movies={[]}
+        totalResults={0}
+        totalPages={0}
+        currentPage={1}
+        activeGenres={[]}
+        activeLanguage={null}
+        activeSortBy="popularity.desc"
+        activeRatingMin={0}
+      />
+    );
+  }
 
   let results;
   try {
     results = await discoverMovies({
-      genres,
-      language,
-      sortBy,
-      ratingMin,
-      yearFrom,
-      yearTo,
-      page,
+      genres: state.genres,
+      language: state.apiLanguage,
+      sortBy: state.sortBy,
+      ratingMin: state.ratingMin,
+      yearFrom: state.yearFrom,
+      yearTo: state.yearTo,
+      page: state.page,
     });
   } catch {
     results = { movies: [], page: 1, totalPages: 0, totalResults: 0 };
   }
 
+  const listKey = buildDiscoverUrl({
+    genres: state.genres,
+    language: state.activeLanguage,
+    sortBy: state.sortBy,
+    ratingMin: state.ratingMin,
+    yearFrom: state.yearFrom,
+    yearTo: state.yearTo,
+    page: state.page,
+  });
+
   return (
     <DiscoverPageContent
+      key={listKey}
       movies={results.movies}
       totalResults={results.totalResults}
       totalPages={results.totalPages}
-      currentPage={page}
-      activeGenres={genres}
-      activeLanguage={language ?? null}
-      activeSortBy={sortBy}
-      activeRatingMin={ratingMin}
+      currentPage={state.page}
+      activeGenres={state.genres}
+      activeLanguage={state.activeLanguage}
+      activeSortBy={state.sortBy}
+      activeRatingMin={state.ratingMin}
+      yearFrom={state.yearFrom}
+      yearTo={state.yearTo}
     />
   );
 }

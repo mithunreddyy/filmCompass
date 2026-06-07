@@ -1,14 +1,22 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { SlidersHorizontal, X } from "lucide-react";
+import { SlidersHorizontal, X, Loader2 } from "lucide-react";
 import { MovieGrid } from "@/components/movies/movie-grid";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { GENRES, LANGUAGES } from "@/types/movie";
 import type { Movie } from "@/types/movie";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import {
+  SORT_OPTIONS,
+  buildDiscoverApiParams,
+  buildDiscoverUrl,
+} from "@/lib/discover-params";
+import { fetchDiscoverPage } from "@/lib/api-client";
+import { TMDB_DEFAULT_ORIGINAL_LANG } from "@/lib/tmdb-config";
 
 interface DiscoverPageContentProps {
   movies: Movie[];
@@ -19,19 +27,27 @@ interface DiscoverPageContentProps {
   activeLanguage: string | null;
   activeSortBy: string;
   activeRatingMin: number;
+  yearFrom?: number;
+  yearTo?: number;
+  title?: string;
+  description?: string;
+  kicker?: string;
 }
 
-const SORT_OPTIONS = [
-  { value: "popularity.desc", label: "Most Popular" },
-  { value: "vote_average.desc", label: "Highest Rated" },
-  { value: "primary_release_date.desc", label: "Newest" },
-  { value: "primary_release_date.asc", label: "Oldest" },
-  { value: "revenue.desc", label: "Highest Revenue" },
-  { value: "original_title.asc", label: "A-Z" },
-];
+function mergeMovies(base: Movie[], extra: Movie[]): Movie[] {
+  const seen = new Set(base.map((m) => m.id));
+  const merged = [...base];
+  for (const movie of extra) {
+    if (!seen.has(movie.id)) {
+      seen.add(movie.id);
+      merged.push(movie);
+    }
+  }
+  return merged;
+}
 
 export function DiscoverPageContent({
-  movies,
+  movies: initialMovies,
   totalResults,
   totalPages,
   currentPage,
@@ -39,246 +55,267 @@ export function DiscoverPageContent({
   activeLanguage,
   activeSortBy,
   activeRatingMin,
+  yearFrom,
+  yearTo,
+  title = "Discover",
+  description,
+  kicker = "Catalogue",
 }: DiscoverPageContentProps) {
   const router = useRouter();
   const [showFilters, setShowFilters] = useState(true);
+  const [extraMovies, setExtraMovies] = useState<Movie[]>([]);
+  const [page, setPage] = useState(currentPage);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  function buildUrl(overrides: Record<string, string | undefined>) {
-    const params = new URLSearchParams();
-    const genres = overrides.genres ?? (activeGenres.length ? activeGenres.join(",") : undefined);
-    const language = overrides.language ?? activeLanguage ?? undefined;
-    const sortBy = overrides.sortBy ?? activeSortBy;
-    const ratingMin = overrides.ratingMin ?? (activeRatingMin > 0 ? String(activeRatingMin) : undefined);
-    const page = overrides.page ?? "1";
+  const movies = useMemo(
+    () => mergeMovies(initialMovies, extraMovies),
+    [initialMovies, extraMovies]
+  );
 
-    if (genres) params.set("genres", genres);
-    if (language) params.set("language", language);
-    if (sortBy && sortBy !== "popularity.desc") params.set("sortBy", sortBy);
-    if (ratingMin) params.set("ratingMin", ratingMin);
-    if (page !== "1") params.set("page", page);
+  const filterState = {
+    genres: activeGenres,
+    activeLanguage,
+    sortBy: activeSortBy,
+    ratingMin: activeRatingMin,
+    yearFrom,
+    yearTo,
+  };
 
-    const qs = params.toString();
-    return `/discover${qs ? `?${qs}` : ""}`;
+  function urlWith(overrides: {
+    genres?: number[];
+    language?: string | null;
+    sortBy?: string;
+    ratingMin?: number;
+    page?: number;
+  }) {
+    return buildDiscoverUrl({
+      genres: overrides.genres ?? activeGenres,
+      language:
+        overrides.language !== undefined ? overrides.language : activeLanguage,
+      sortBy: overrides.sortBy ?? activeSortBy,
+      ratingMin: overrides.ratingMin ?? activeRatingMin,
+      yearFrom,
+      yearTo,
+      page: overrides.page ?? 1,
+    });
+  }
+
+  async function loadMore() {
+    const maxPage = Math.min(totalPages, 500);
+    if (loadingMore || page >= maxPage) return;
+
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const params = buildDiscoverApiParams({ ...filterState, page: nextPage });
+      const data = await fetchDiscoverPage(params);
+
+      setExtraMovies((prev) => mergeMovies(prev, data.data));
+      setPage(nextPage);
+      router.replace(urlWith({ page: nextPage }), { scroll: false });
+    } finally {
+      setLoadingMore(false);
+    }
   }
 
   function toggleGenre(genreId: number) {
     const newGenres = activeGenres.includes(genreId)
       ? activeGenres.filter((g) => g !== genreId)
       : [...activeGenres, genreId];
-    router.push(buildUrl({ genres: newGenres.length ? newGenres.join(",") : undefined, page: "1" }));
+    router.push(urlWith({ genres: newGenres, page: 1 }));
   }
 
+  const isTeluguDefault =
+    activeLanguage === TMDB_DEFAULT_ORIGINAL_LANG &&
+    activeGenres.length === 0 &&
+    activeRatingMin === 0 &&
+    activeSortBy === "popularity.desc" &&
+    !yearFrom &&
+    !yearTo;
+
+  const languageLabel =
+    activeLanguage === null
+      ? "all languages"
+      : LANGUAGES.find((l) => l.code === activeLanguage)?.name ?? activeLanguage;
+
   return (
-    <div className="pt-28 pb-16">
-      <div className="mx-auto max-w-7xl px-4 md:px-6">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8 flex items-end justify-between"
-        >
-          <div>
-            <h1 className="font-heading text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-              Discover
-            </h1>
-            <p className="mt-2 text-muted-foreground">
-              {totalResults.toLocaleString()} movies to explore
-            </p>
-          </div>
+    <PageShell>
+      <PageHeader
+        kicker={kicker}
+        title={title}
+        description={
+          description ??
+          `${totalResults.toLocaleString()} ${languageLabel} films to explore`
+        }
+        action={
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={cn(
-              "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all border",
-              showFilters
-                ? "border-amber-500/50 bg-amber-500/10 text-amber-500"
-                : "border-border/50 bg-card/50 text-muted-foreground hover:text-foreground"
+              "fc-chip flex items-center gap-2 self-start sm:self-auto",
+              showFilters && "fc-chip-active"
             )}
           >
             <SlidersHorizontal size={14} />
             Filters
           </button>
-        </motion.div>
+        }
+      />
 
-        {/* Filters Panel */}
-        {showFilters && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mb-8 space-y-6 rounded-2xl border border-border/30 bg-card/30 p-6 backdrop-blur-sm"
-          >
-            {/* Sort */}
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                Sort by
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {SORT_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() =>
-                      router.push(buildUrl({ sortBy: option.value, page: "1" }))
-                    }
-                    className={cn(
-                      "rounded-full px-3.5 py-1.5 text-xs font-medium transition-all border",
-                      activeSortBy === option.value
-                        ? "border-amber-500 bg-amber-500/10 text-amber-500"
-                        : "border-border/30 text-muted-foreground hover:text-foreground hover:border-border"
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Genres */}
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                Genres
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {GENRES.map((genre) => (
-                  <button
-                    key={genre.id}
-                    onClick={() => toggleGenre(genre.id)}
-                    className={cn(
-                      "rounded-full px-3.5 py-1.5 text-xs font-medium transition-all border",
-                      activeGenres.includes(genre.id)
-                        ? "border-amber-500 bg-amber-500/10 text-amber-500"
-                        : "border-border/30 text-muted-foreground hover:text-foreground hover:border-border"
-                    )}
-                  >
-                    {genre.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Languages */}
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                Language
-              </h3>
-              <div className="flex flex-wrap gap-2">
+      {showFilters && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          className="mb-5 space-y-4 fc-glass p-4 sm:p-5"
+        >
+          <div>
+            <h3 className="fc-kicker mb-3 !tracking-[0.18em]">
+              Sort by
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {SORT_OPTIONS.map((option) => (
                 <button
+                  key={option.value}
+                  onClick={() =>
+                    router.push(urlWith({ sortBy: option.value, page: 1 }))
+                  }
+                  className={cn(
+                    "fc-chip",
+                    activeSortBy === option.value && "fc-chip-active"
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="fc-kicker mb-3 !tracking-[0.18em]">
+              Genres
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {GENRES.map((genre) => (
+                <button
+                  key={genre.id}
+                  onClick={() => toggleGenre(genre.id)}
+                  className={cn(
+                    "fc-chip",
+                    activeGenres.includes(genre.id) && "fc-chip-active"
+                  )}
+                >
+                  {genre.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="fc-kicker mb-3 !tracking-[0.18em]">
+              Language
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => router.push(urlWith({ language: null, page: 1 }))}
+                className={cn("fc-chip", activeLanguage === null && "fc-chip-active")}
+              >
+                All languages
+              </button>
+              {LANGUAGES.map((lang) => (
+                <button
+                  key={lang.code}
+                  onClick={() =>
+                    router.push(urlWith({ language: lang.code, page: 1 }))
+                  }
+                  className={cn(
+                    "fc-chip",
+                    activeLanguage === lang.code && "fc-chip-active"
+                  )}
+                >
+                  {lang.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="fc-kicker mb-3 !tracking-[0.18em]">
+              Minimum Rating
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {[0, 5, 6, 7, 7.5, 8, 8.5].map((r) => (
+                <button
+                  key={r}
                   onClick={() =>
                     router.push(
-                      buildUrl({ language: undefined, page: "1" })
+                      urlWith({ ratingMin: r, page: 1 })
                     )
                   }
                   className={cn(
-                    "rounded-full px-3.5 py-1.5 text-xs font-medium transition-all border",
-                    !activeLanguage
-                      ? "border-amber-500 bg-amber-500/10 text-amber-500"
-                      : "border-border/30 text-muted-foreground hover:text-foreground hover:border-border"
+                    "fc-chip",
+                    activeRatingMin === r && "fc-chip-active"
                   )}
                 >
-                  All
+                  {r === 0 ? "Any" : `${r}+`}
                 </button>
-                {LANGUAGES.map((lang) => (
-                  <button
-                    key={lang.code}
-                    onClick={() =>
-                      router.push(
-                        buildUrl({
-                          language:
-                            activeLanguage === lang.code
-                              ? undefined
-                              : lang.code,
-                          page: "1",
-                        })
-                      )
-                    }
-                    className={cn(
-                      "rounded-full px-3.5 py-1.5 text-xs font-medium transition-all border",
-                      activeLanguage === lang.code
-                        ? "border-amber-500 bg-amber-500/10 text-amber-500"
-                        : "border-border/30 text-muted-foreground hover:text-foreground hover:border-border"
-                    )}
-                  >
-                    {lang.name}
-                  </button>
-                ))}
-              </div>
+              ))}
             </div>
+          </div>
 
-            {/* Minimum Rating */}
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                Minimum Rating
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {[0, 5, 6, 7, 7.5, 8, 8.5].map((r) => (
-                  <button
-                    key={r}
-                    onClick={() =>
-                      router.push(
-                        buildUrl({
-                          ratingMin: r > 0 ? String(r) : undefined,
-                          page: "1",
-                        })
-                      )
-                    }
-                    className={cn(
-                      "rounded-full px-3.5 py-1.5 text-xs font-medium transition-all border",
-                      activeRatingMin === r
-                        ? "border-amber-500 bg-amber-500/10 text-amber-500"
-                        : "border-border/30 text-muted-foreground hover:text-foreground hover:border-border"
-                    )}
-                  >
-                    {r === 0 ? "Any" : `${r}+`}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Active Filters Clear */}
-            {(activeGenres.length > 0 ||
-              activeLanguage ||
-              activeRatingMin > 0 ||
-              activeSortBy !== "popularity.desc") && (
-              <div className="pt-2 border-t border-border/30">
-                <button
-                  onClick={() => router.push("/discover")}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <X size={12} />
-                  Clear all filters
-                </button>
-              </div>
-            )}
-          </motion.div>
-        )}
-
-        {/* Results */}
-        <MovieGrid movies={movies} />
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="mt-10 flex items-center justify-center gap-2">
-            {currentPage > 1 && (
-              <Link
-                href={buildUrl({ page: String(currentPage - 1) })}
-                className="rounded-full border border-border/50 bg-card/50 px-5 py-2 text-sm font-medium text-foreground transition-all hover:border-amber-500/50 hover:text-amber-500"
+          {!isTeluguDefault && (
+            <div className="border-t border-border pt-2">
+              <button
+                onClick={() => router.push("/discover")}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-brand-violet"
               >
+                <X size={12} />
+                Reset to Telugu default
+              </button>
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      <MovieGrid
+        movies={movies}
+        emptyTitle="No films match these filters"
+        emptyDescription="Relax rating, genre, or year filters — or reset to the default Telugu catalogue."
+      />
+
+      {totalPages > 1 && (
+        <div className="mt-6 flex flex-col items-center gap-2 sm:mt-7">
+          {page < Math.min(totalPages, 500) && (
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="fc-btn-primary inline-flex min-w-[140px] items-center justify-center gap-2"
+            >
+              {loadingMore ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Loading…
+                </>
+              ) : (
+                "Load more"
+              )}
+            </button>
+          )}
+          <div className="flex items-center gap-2">
+            {page > 1 && (
+              <Link href={urlWith({ page: page - 1 })} className="fc-btn-ghost">
                 Previous
               </Link>
             )}
             <span className="px-4 py-2 text-sm text-muted-foreground">
-              Page {currentPage} of {Math.min(totalPages, 500)}
+              Page {page} of {Math.min(totalPages, 500)}
             </span>
-            {currentPage < totalPages && currentPage < 500 && (
-              <Link
-                href={buildUrl({ page: String(currentPage + 1) })}
-                className="rounded-full border border-border/50 bg-card/50 px-5 py-2 text-sm font-medium text-foreground transition-all hover:border-amber-500/50 hover:text-amber-500"
-              >
+            {page < totalPages && page < 500 && (
+              <Link href={urlWith({ page: page + 1 })} className="fc-btn-ghost">
                 Next
               </Link>
             )}
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </PageShell>
   );
 }

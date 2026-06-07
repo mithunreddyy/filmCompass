@@ -329,8 +329,8 @@ export function getGenreById(id: number): Genre | undefined {
 // ============================================
 
 export const LANGUAGES = [
-  { code: "en", name: "English" },
   { code: "te", name: "Telugu" },
+  { code: "en", name: "English" },
   { code: "hi", name: "Hindi" },
   { code: "ta", name: "Tamil" },
   { code: "ml", name: "Malayalam" },

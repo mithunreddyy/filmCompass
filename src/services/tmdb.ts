@@ -1,4 +1,13 @@
-import { cache, CACHE_TTL } from "@/lib/cache";
+import { cacheGet, cacheSet, CACHE_TTL } from "@/lib/redis-cache";
+import { getServerEnv } from "@/lib/env";
+import { NotFoundError } from "@/lib/errors";
+import {
+  TMDB_LOCALE,
+  TMDB_DEFAULT_ORIGINAL_LANG,
+  TMDB_REGION,
+  TMDB_VOTE_COUNT_DEFAULT,
+  TMDB_VOTE_COUNT_REGIONAL,
+} from "@/lib/tmdb-config";
 import type {
   TMDbMovie,
   TMDbMovieDetail,
@@ -49,20 +58,38 @@ export const IMAGE_SIZES = {
 // ============================================
 
 function getApiKey(): string {
-  const key = process.env.TMDB_API_KEY;
-  if (!key) {
-    throw new Error("TMDB_API_KEY environment variable is not set");
+  return getServerEnv().TMDB_API_KEY;
+}
+
+function getAccessToken(): string | null {
+  return getServerEnv().TMDB_ACCESS_TOKEN ?? null;
+}
+
+function buildAuthHeaders(): HeadersInit {
+  const token = getAccessToken();
+  if (token) {
+    return {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    };
   }
-  return key;
+  return { Accept: "application/json" };
 }
 
 async function tmdbFetch<T>(
   endpoint: string,
   params: Record<string, string | number | boolean | undefined> = {}
 ): Promise<T> {
-  const apiKey = getApiKey();
+  const token = getAccessToken();
   const searchParams = new URLSearchParams();
-  searchParams.set("api_key", apiKey);
+
+  if (!token) {
+    searchParams.set("api_key", getApiKey());
+  }
+
+  if (!searchParams.has("language")) {
+    searchParams.set("language", TMDB_LOCALE);
+  }
 
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== "") {
@@ -71,20 +98,20 @@ async function tmdbFetch<T>(
   });
 
   const url = `${TMDB_BASE_URL}${endpoint}?${searchParams.toString()}`;
-  const cacheKey = `tmdb:${url}`;
+  const cacheKey = `tmdb:${endpoint}:${searchParams.toString()}`;
 
-  // Check cache first
-  const cached = cache.get<T>(cacheKey);
+  const cached = await cacheGet<T>(cacheKey);
   if (cached) return cached;
 
   const response = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-    },
+    headers: buildAuthHeaders(),
     next: { revalidate: 300 },
   });
 
   if (!response.ok) {
+    if (response.status === 404) {
+      throw new NotFoundError("Movie not found");
+    }
     throw new Error(
       `TMDb API error: ${response.status} ${response.statusText}`
     );
@@ -92,13 +119,14 @@ async function tmdbFetch<T>(
 
   const data = (await response.json()) as T;
 
-  // Cache the result
   const ttl = endpoint.includes("trending")
     ? CACHE_TTL.TRENDING
     : endpoint.includes("movie/")
       ? CACHE_TTL.MOVIE_DETAIL
-      : CACHE_TTL.SEARCH;
-  cache.set(cacheKey, data, ttl);
+      : endpoint.includes("discover")
+        ? CACHE_TTL.DISCOVER
+        : CACHE_TTL.SEARCH;
+  await cacheSet(cacheKey, data, ttl);
 
   return data;
 }
@@ -107,12 +135,18 @@ async function tmdbFetch<T>(
 // Data Transformers
 // ============================================
 
+function pickEnglishTitle(title: string, originalTitle: string): string {
+  const localized = title?.trim();
+  if (localized) return localized;
+  return originalTitle?.trim() ?? "";
+}
+
 export function transformMovie(movie: TMDbMovie): Movie {
   return {
     id: movie.id,
-    title: movie.title,
+    title: pickEnglishTitle(movie.title, movie.original_title),
     originalTitle: movie.original_title,
-    overview: movie.overview,
+    overview: movie.overview?.trim() ?? "",
     posterUrl: movie.poster_path
       ? `${IMAGE_SIZES.poster.large}${movie.poster_path}`
       : null,
@@ -154,9 +188,9 @@ export function transformMovieDetail(movie: TMDbMovieDetail): MovieDetail {
 
   return {
     id: movie.id,
-    title: movie.title,
+    title: pickEnglishTitle(movie.title, movie.original_title),
     originalTitle: movie.original_title,
-    overview: movie.overview,
+    overview: movie.overview?.trim() ?? "",
     posterUrl: movie.poster_path
       ? `${IMAGE_SIZES.poster.large}${movie.poster_path}`
       : null,
@@ -327,26 +361,36 @@ export async function discoverMovies(params: {
   genres?: number[];
   yearFrom?: number;
   yearTo?: number;
+  releaseDateFrom?: string;
+  releaseDateTo?: string;
   ratingMin?: number;
   ratingMax?: number;
   language?: string;
   sortBy?: string;
   page?: number;
 }) {
+  const hasLanguageFilter = Boolean(params.language);
+
   const apiParams: Record<string, string | number | boolean | undefined> = {
     sort_by: params.sortBy ?? "popularity.desc",
     include_adult: false,
     page: params.page ?? 1,
-    "vote_count.gte": 50,
+    "vote_count.gte": hasLanguageFilter
+      ? TMDB_VOTE_COUNT_REGIONAL
+      : TMDB_VOTE_COUNT_DEFAULT,
   };
 
   if (params.genres?.length) {
     apiParams.with_genres = params.genres.join(",");
   }
-  if (params.yearFrom) {
+  if (params.releaseDateFrom) {
+    apiParams["primary_release_date.gte"] = params.releaseDateFrom;
+  } else if (params.yearFrom) {
     apiParams["primary_release_date.gte"] = `${params.yearFrom}-01-01`;
   }
-  if (params.yearTo) {
+  if (params.releaseDateTo) {
+    apiParams["primary_release_date.lte"] = params.releaseDateTo;
+  } else if (params.yearTo) {
     apiParams["primary_release_date.lte"] = `${params.yearTo}-12-31`;
   }
   if (params.ratingMin && params.ratingMin > 0) {
@@ -389,7 +433,7 @@ export async function getTopRated(page: number = 1) {
 export async function getNowPlaying(page: number = 1) {
   const data = await tmdbFetch<TMDbPaginatedResponse<TMDbMovie>>(
     "/movie/now_playing",
-    { page }
+    { page, region: TMDB_REGION }
   );
 
   return {
@@ -403,7 +447,7 @@ export async function getNowPlaying(page: number = 1) {
 export async function getUpcoming(page: number = 1) {
   const data = await tmdbFetch<TMDbPaginatedResponse<TMDbMovie>>(
     "/movie/upcoming",
-    { page }
+    { page, region: TMDB_REGION }
   );
 
   return {
@@ -415,7 +459,8 @@ export async function getUpcoming(page: number = 1) {
 }
 
 export async function getGenreList(): Promise<Genre[]> {
-  const cached = cache.get<Genre[]>("tmdb:genres");
+  const cacheKey = "tmdb:genres";
+  const cached = await cacheGet<Genre[]>(cacheKey);
   if (cached) return cached;
 
   const data = await tmdbFetch<{ genres: TMDbGenre[] }>("/genre/movie/list");
@@ -425,7 +470,7 @@ export async function getGenreList(): Promise<Genre[]> {
     slug: g.name.toLowerCase().replace(/\s+/g, "-"),
   }));
 
-  cache.set("tmdb:genres", genres, CACHE_TTL.GENRES);
+  await cacheSet(cacheKey, genres, CACHE_TTL.GENRES);
   return genres;
 }
 
@@ -433,9 +478,180 @@ export async function getGenreList(): Promise<Genre[]> {
  * Get "hidden gems" — high-rated movies with lower popularity
  */
 export async function getHiddenGems(page: number = 1) {
+  const { getTeluguHiddenGemsPaginated } = await import("@/services/telugu-gems");
+  return getTeluguHiddenGemsPaginated(page);
+}
+
+// ============================================
+// Telugu-first helpers
+// ============================================
+
+export async function getTeluguTrending(page: number = 1) {
   return discoverMovies({
-    ratingMin: 7.5,
+    language: TMDB_DEFAULT_ORIGINAL_LANG,
+    sortBy: "popularity.desc",
+    page,
+  });
+}
+
+export async function getTeluguTopRated(page: number = 1) {
+  return discoverMovies({
+    language: TMDB_DEFAULT_ORIGINAL_LANG,
     sortBy: "vote_average.desc",
     page,
   });
+}
+
+export async function getTeluguHiddenGems(page: number = 1) {
+  return getHiddenGems(page);
+}
+
+function filterTeluguMovies(movies: Movie[]): Movie[] {
+  return movies.filter((m) => m.language === TMDB_DEFAULT_ORIGINAL_LANG);
+}
+
+const TELUGU_NOW_PLAYING_CACHE_KEY = "tmdb:telugu-now-playing:merged";
+
+/** India theatrical now-playing (region IN), Telugu only */
+async function fetchTeluguNowPlayingMerged(): Promise<Movie[]> {
+  const cached = await cacheGet<Movie[]>(TELUGU_NOW_PLAYING_CACHE_KEY);
+  if (cached) return cached;
+
+  const pages = await Promise.all(
+    [1, 2, 3, 4, 5].map((p) =>
+      getNowPlaying(p).catch(() => ({ movies: [] as Movie[] }))
+    )
+  );
+
+  const telugu = filterTeluguMovies(pages.flatMap((r) => r.movies));
+  const seen = new Set<number>();
+  const unique: Movie[] = [];
+
+  for (const movie of telugu) {
+    if (!seen.has(movie.id)) {
+      seen.add(movie.id);
+      unique.push(movie);
+    }
+  }
+
+  unique.sort((a, b) => b.releaseDate.localeCompare(a.releaseDate));
+
+  await cacheSet(TELUGU_NOW_PLAYING_CACHE_KEY, unique, CACHE_TTL.TRENDING);
+  return unique;
+}
+
+/** Telugu films currently in Indian theaters — TMDb /movie/now_playing?region=IN */
+export async function getTeluguNowPlaying(page: number = 1) {
+  const all = await fetchTeluguNowPlayingMerged();
+  const perPage = 20;
+  const start = (page - 1) * perPage;
+
+  return {
+    movies: all.slice(start, start + perPage),
+    page,
+    totalPages: Math.max(1, Math.ceil(all.length / perPage)),
+    totalResults: all.length,
+  };
+}
+
+function toISODate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function filterFutureTelugu(movies: Movie[], fromDate: string): Movie[] {
+  return movies.filter(
+    (m) =>
+      m.language === TMDB_DEFAULT_ORIGINAL_LANG &&
+      m.releaseDate &&
+      m.releaseDate >= fromDate
+  );
+}
+
+function mergeMoviesByReleaseDate(...lists: Movie[][]): Movie[] {
+  const seen = new Set<number>();
+  const merged: Movie[] = [];
+  for (const list of lists) {
+    for (const movie of list) {
+      if (!seen.has(movie.id)) {
+        seen.add(movie.id);
+        merged.push(movie);
+      }
+    }
+  }
+  return merged.sort((a, b) => a.releaseDate.localeCompare(b.releaseDate));
+}
+
+const TELUGU_UPCOMING_CACHE_KEY = "tmdb:telugu-upcoming:merged";
+
+async function fetchTeluguUpcomingMerged(): Promise<Movie[]> {
+  const cached = await cacheGet<Movie[]>(TELUGU_UPCOMING_CACHE_KEY);
+  if (cached) return cached;
+
+  const today = toISODate(new Date());
+  const end = new Date();
+  end.setMonth(end.getMonth() + 18);
+  const endISO = toISODate(end);
+
+  const [theatricalPages, discoverPages] = await Promise.all([
+    Promise.all(
+      [1, 2, 3].map((p) =>
+        getUpcoming(p).catch(() => ({ movies: [] as Movie[] }))
+      )
+    ),
+    Promise.all(
+      [1, 2].map((p) =>
+        discoverMovies({
+          language: TMDB_DEFAULT_ORIGINAL_LANG,
+          sortBy: "primary_release_date.asc",
+          releaseDateFrom: today,
+          releaseDateTo: endISO,
+          page: p,
+        }).catch(() => ({ movies: [] as Movie[] }))
+      )
+    ),
+  ]);
+
+  const theatrical = mergeMoviesByReleaseDate(
+    ...theatricalPages.map((r) => filterFutureTelugu(r.movies, today))
+  );
+  const discovered = mergeMoviesByReleaseDate(
+    ...discoverPages.map((r) => filterFutureTelugu(r.movies, today))
+  );
+  const all = mergeMoviesByReleaseDate(theatrical, discovered);
+
+  await cacheSet(TELUGU_UPCOMING_CACHE_KEY, all, CACHE_TTL.TRENDING);
+  return all;
+}
+
+/** Upcoming Telugu films from today onward — India theatrical + discover */
+export async function getTeluguUpcoming(page: number = 1) {
+  const all = await fetchTeluguUpcomingMerged();
+  const perPage = 20;
+  const start = (page - 1) * perPage;
+
+  return {
+    movies: all.slice(start, start + perPage),
+    page,
+    totalPages: Math.max(1, Math.ceil(all.length / perPage)),
+    totalResults: all.length,
+  };
+}
+
+/** Merge movies from two pages, deduplicating by id */
+export async function fetchTwoPages(
+  fetcher: (page: number) => Promise<{ movies: Movie[] }>
+): Promise<Movie[]> {
+  const [p1, p2] = await Promise.all([fetcher(1), fetcher(2)]);
+  const seen = new Set<number>();
+  const merged: Movie[] = [];
+  for (const movie of [...p1.movies, ...p2.movies]) {
+    if (!seen.has(movie.id)) {
+      seen.add(movie.id);
+      merged.push(movie);
+    }
+  }
+  return merged;
 }

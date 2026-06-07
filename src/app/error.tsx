@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { AlertTriangle } from "lucide-react";
+import Link from "next/link";
 
 export default function Error({
   error,
@@ -15,25 +16,26 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="flex min-h-[70vh] items-center justify-center px-4">
-      <div className="text-center">
-        <AlertTriangle
-          size={48}
-          className="mx-auto mb-6 text-amber-500/50"
-        />
-        <h2 className="font-heading text-2xl font-bold text-foreground mb-3">
+    <div className="fc-page flex min-h-[55vh] items-center justify-center">
+      <div className="fc-glass flex min-h-[240px] w-full max-w-lg flex-col items-center justify-center px-6 py-12 text-center sm:min-h-[280px]">
+        <div className="relative mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-violet/20 to-brand-mint/10 ring-1 ring-brand-violet/25">
+          <div className="absolute inset-0 rounded-2xl fc-shimmer opacity-40" aria-hidden />
+          <AlertTriangle className="relative h-8 w-8 text-brand-violet" strokeWidth={1.5} />
+        </div>
+        <h2 className="text-lg font-semibold tracking-tight text-foreground">
           Something went wrong
         </h2>
-        <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-          We encountered an error while loading this page. This might be a
-          temporary issue.
+        <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+          We hit a snag loading this page. It might be temporary — try again in a moment.
         </p>
-        <button
-          onClick={reset}
-          className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-6 py-3 text-sm font-semibold text-black transition-all hover:bg-amber-400"
-        >
-          Try Again
-        </button>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
+          <button type="button" onClick={reset} className="fc-btn-primary text-sm">
+            Try again
+          </button>
+          <Link href="/" className="fc-btn-ghost text-sm">
+            Back to Home
+          </Link>
+        </div>
       </div>
     </div>
   );

@@ -1,23 +1,48 @@
-import { getTrending, getTopRated, getHiddenGems, getNowPlaying, getUpcoming } from "@/services/tmdb";
-import { HomeContent } from "./home-content";
+import { Suspense } from "react";
+import {
+  HomeHero,
+  HomeCatalogueShell,
+  TeluguTrendingSection,
+  TeluguNowPlayingSection,
+  TeluguHiddenGemsSection,
+  TeluguTopRatedSection,
+  TeluguUpcomingSection,
+  WorldCinemaSection,
+} from "./home-sections";
+import {
+  HeroSkeletonBlock,
+  SectionSkeleton,
+} from "@/components/movies/section-skeleton";
 
-export default async function HomePage() {
-  const [trending, topRated, hiddenGems, nowPlaying, upcoming] =
-    await Promise.all([
-      getTrending("week", 1).catch(() => ({ movies: [], page: 1, totalPages: 0, totalResults: 0 })),
-      getTopRated(1).catch(() => ({ movies: [], page: 1, totalPages: 0, totalResults: 0 })),
-      getHiddenGems(1).catch(() => ({ movies: [], page: 1, totalPages: 0, totalResults: 0 })),
-      getNowPlaying(1).catch(() => ({ movies: [], page: 1, totalPages: 0, totalResults: 0 })),
-      getUpcoming(1).catch(() => ({ movies: [], page: 1, totalPages: 0, totalResults: 0 })),
-    ]);
+export const revalidate = 600;
 
+export default function HomePage() {
   return (
-    <HomeContent
-      trending={trending.movies}
-      topRated={topRated.movies}
-      hiddenGems={hiddenGems.movies}
-      nowPlaying={nowPlaying.movies}
-      upcoming={upcoming.movies}
-    />
+    <div className="flex flex-col">
+      <Suspense fallback={<HeroSkeletonBlock />}>
+        <HomeHero />
+      </Suspense>
+
+      <HomeCatalogueShell>
+        <Suspense fallback={<SectionSkeleton title="Telugu Trending" />}>
+          <TeluguTrendingSection />
+        </Suspense>
+        <Suspense fallback={<SectionSkeleton title="Telugu In Theaters" />}>
+          <TeluguNowPlayingSection />
+        </Suspense>
+        <Suspense fallback={<SectionSkeleton title="Telugu Hidden Gems" />}>
+          <TeluguHiddenGemsSection />
+        </Suspense>
+        <Suspense fallback={<SectionSkeleton title="Top Rated Telugu" />}>
+          <TeluguTopRatedSection />
+        </Suspense>
+        <Suspense fallback={<SectionSkeleton title="Upcoming Telugu" />}>
+          <TeluguUpcomingSection />
+        </Suspense>
+        <Suspense fallback={<SectionSkeleton title="World Cinema" />}>
+          <WorldCinemaSection />
+        </Suspense>
+      </HomeCatalogueShell>
+    </div>
   );
 }

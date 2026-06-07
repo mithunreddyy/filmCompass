@@ -15,23 +15,27 @@ export function SectionHeader({
   linkText = "View all",
 }: SectionHeaderProps) {
   return (
-    <div className="mb-5 flex items-end justify-between gap-3 sm:mb-6">
-      <div className="min-w-0">
-        <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl md:text-2xl">
+    <div className="mb-3">
+      <div className="flex items-center gap-2">
+        <span className="fc-section-accent" aria-hidden />
+        <h2 className="fc-section-title shrink-0 font-bold text-foreground">
           {title}
         </h2>
-        {subtitle && (
-          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">{subtitle}</p>
+        <span className="h-px flex-1 bg-gradient-to-r from-border via-border/50 to-transparent" />
+        {href && (
+          <Link
+            href={href}
+            className="group flex shrink-0 items-center gap-0.5 text-xs font-semibold text-brand-violet"
+          >
+            {linkText}
+            <ChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+          </Link>
         )}
       </div>
-      {href && (
-        <Link
-          href={href}
-          className="group flex shrink-0 items-center gap-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground sm:text-sm"
-        >
-          {linkText}
-          <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 sm:h-4 sm:w-4" />
-        </Link>
+      {subtitle && (
+        <p className="mt-1 pl-2.5 text-[11px] text-muted-foreground sm:text-xs">
+          {subtitle}
+        </p>
       )}
     </div>
   );

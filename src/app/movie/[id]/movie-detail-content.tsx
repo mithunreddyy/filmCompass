@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Star,
@@ -10,27 +9,30 @@ import {
   DollarSign,
   ExternalLink,
   Play,
-  ChevronRight,
 } from "lucide-react";
 import type { MovieDetail } from "@/types/movie";
 import { MovieCarousel } from "@/components/movies/movie-carousel";
-import { SectionHeader } from "@/components/shared/section-header";
-import { RatingBadge } from "@/components/movies/rating-badge";
+import { RatingPill } from "@/components/movies/rating-pill";
 import { GenreBadge } from "@/components/shared/genre-badge";
 import { useState } from "react";
-import { cn } from "@/lib/utils";
+import {
+  MovieDetailTabs,
+  type MovieDetailTab,
+} from "@/components/movies/detail/movie-detail-tabs";
+import { MovieTrailerModal } from "@/components/movies/detail/movie-trailer-modal";
+import { OMDbEnrichmentPanel } from "@/components/movies/detail/omdb-enrichment-panel";
+import type { OMDbEnrichment } from "@/services/omdb";
 
 interface MovieDetailContentProps {
   movie: MovieDetail;
+  omdb?: OMDbEnrichment | null;
 }
 
-type TabType = "overview" | "cast" | "reviews" | "similar";
-
-export function MovieDetailContent({ movie }: MovieDetailContentProps) {
-  const [activeTab, setActiveTab] = useState<TabType>("overview");
+export function MovieDetailContent({ movie, omdb }: MovieDetailContentProps) {
+  const [activeTab, setActiveTab] = useState<MovieDetailTab>("overview");
   const [showTrailer, setShowTrailer] = useState(false);
 
-  const tabs: { id: TabType; label: string; count?: number }[] = [
+  const tabs: { id: MovieDetailTab; label: string; count?: number }[] = [
     { id: "overview", label: "Overview" },
     { id: "cast", label: "Cast & Crew", count: movie.cast.length },
     { id: "reviews", label: "Reviews", count: movie.reviews.length },
@@ -56,7 +58,7 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
   return (
     <div className="flex flex-col">
       {/* Hero Backdrop */}
-      <section className="relative h-[60vh] min-h-[400px] w-full overflow-hidden">
+      <section className="relative h-[42vh] min-h-[240px] w-full overflow-hidden sm:h-[48vh] sm:min-h-[320px] md:h-[52vh] md:min-h-[380px]">
         {movie.backdropUrl && (
           <Image
             src={movie.backdropUrl}
@@ -69,11 +71,12 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/30" />
         <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-transparent" />
+        <div className="absolute inset-0 fc-vignette pointer-events-none opacity-60" />
       </section>
 
       {/* Content */}
-      <div className="relative -mt-48 mx-auto w-full max-w-7xl px-4 md:px-6">
-        <div className="flex flex-col md:flex-row gap-8">
+      <div className="relative -mt-28 mx-auto w-full max-w-7xl px-3 sm:-mt-36 sm:px-4 md:-mt-44 md:px-5">
+        <div className="flex flex-col gap-5 md:flex-row md:gap-6">
           {/* Poster */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -81,7 +84,8 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
             transition={{ duration: 0.5 }}
             className="shrink-0"
           >
-            <div className="relative w-[200px] md:w-[280px] aspect-[2/3] overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10 mx-auto md:mx-0">
+            <div className="relative mx-auto w-[140px] sm:w-[170px] md:mx-0 md:w-[220px] lg:w-[240px]">
+              <div className="fc-poster !rounded-lg shadow-2xl">
               {movie.posterUrl ? (
                 <Image
                   src={movie.posterUrl}
@@ -93,11 +97,12 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
                 />
               ) : (
                 <div className="flex h-full items-center justify-center bg-muted/30">
-                  <span className="text-muted-foreground text-center p-4 font-heading">
+                  <span className="p-4 text-center text-muted-foreground">
                     {movie.title}
                   </span>
                 </div>
               )}
+              </div>
             </div>
           </motion.div>
 
@@ -121,14 +126,14 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
                 </span>
               )}
               {movie.status && movie.status !== "Released" && (
-                <span className="rounded-full bg-amber-500/10 px-3 py-0.5 text-xs font-medium text-amber-500">
+                <span className="rounded-full bg-brand-violet/10 px-3 py-0.5 text-xs font-medium text-brand-violet">
                   {movie.status}
                 </span>
               )}
             </div>
 
             {/* Title */}
-            <h1 className="font-heading text-3xl font-bold tracking-tight text-foreground md:text-4xl lg:text-5xl">
+            <h1 className="fc-page-title font-bold text-foreground sm:text-2xl md:text-3xl lg:text-4xl">
               {movie.title}
             </h1>
 
@@ -153,7 +158,7 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
 
             {/* Rating + Meta */}
             <div className="mt-5 flex flex-wrap items-center gap-5">
-              <RatingBadge rating={movie.rating} size="lg" showLabel />
+              <RatingPill rating={movie.rating} size="md" />
 
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 {movie.runtime && (
@@ -190,7 +195,7 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
               {movie.trailer && (
                 <button
                   onClick={() => setShowTrailer(true)}
-                  className="flex items-center gap-2 rounded-full bg-amber-500 px-6 py-2.5 text-sm font-semibold text-black transition-all duration-300 hover:bg-amber-400 hover:shadow-[0_0_30px_rgba(245,158,11,0.3)]"
+                  className="fc-btn-primary flex items-center gap-2 !rounded-full px-6 py-2.5"
                 >
                   <Play size={16} className="fill-current" />
                   Watch Trailer
@@ -201,7 +206,7 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
                   href={`https://www.imdb.com/title/${movie.imdbId}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 rounded-full border border-border/50 bg-card/50 px-5 py-2.5 text-sm font-medium text-foreground backdrop-blur-sm transition-all hover:border-border hover:bg-card"
+                  className="fc-btn-ghost flex items-center gap-2 !rounded-full px-5 py-2.5"
                 >
                   <ExternalLink size={14} />
                   IMDb
@@ -212,7 +217,7 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
                   href={movie.homepage}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 rounded-full border border-border/50 bg-card/50 px-5 py-2.5 text-sm font-medium text-foreground backdrop-blur-sm transition-all hover:border-border hover:bg-card"
+                  className="fc-btn-ghost flex items-center gap-2 !rounded-full px-5 py-2.5"
                 >
                   <ExternalLink size={14} />
                   Website
@@ -222,51 +227,29 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
           </motion.div>
         </div>
 
-        {/* Tabs */}
-        <div className="mt-12 border-b border-border/30">
-          <div className="flex gap-1 overflow-x-auto no-scrollbar">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  "relative px-5 py-3 text-sm font-medium transition-colors whitespace-nowrap",
-                  activeTab === tab.id
-                    ? "text-amber-500"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {tab.label}
-                {tab.count !== undefined && tab.count > 0 && (
-                  <span className="ml-1.5 text-xs text-muted-foreground">
-                    ({tab.count})
-                  </span>
-                )}
-                {activeTab === tab.id && (
-                  <motion.div
-                    layoutId="activeTab"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500"
-                    transition={{ duration: 0.2 }}
-                  />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+        <MovieDetailTabs
+          tabs={tabs}
+          activeTab={activeTab}
+          onChange={setActiveTab}
+        />
 
         {/* Tab Content */}
-        <div className="py-8">
+        <div className="py-5 sm:py-6">
           {activeTab === "overview" && (
             <motion.div
               key="overview"
+              role="tabpanel"
+              id="panel-overview"
+              aria-labelledby="tab-overview"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
-              className="space-y-8"
+              className="space-y-6"
             >
-              {/* Synopsis */}
+              {omdb && <OMDbEnrichmentPanel enrichment={omdb} />}
+
               <div>
-                <h3 className="font-heading text-lg font-semibold text-foreground mb-3">
+                <h3 className="mb-3 text-lg font-semibold text-foreground">
                   Synopsis
                 </h3>
                 <p className="text-base text-muted-foreground leading-relaxed max-w-3xl">
@@ -300,7 +283,7 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
                 ].map((stat) => (
                   <div
                     key={stat.label}
-                    className="rounded-xl border border-border/30 bg-card/30 p-4"
+                    className="fc-card !p-4"
                   >
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
                       <stat.icon size={12} />
@@ -316,14 +299,14 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
               {/* Keywords */}
               {movie.keywords.length > 0 && (
                 <div>
-                  <h3 className="font-heading text-lg font-semibold text-foreground mb-3">
+                  <h3 className="mb-3 text-lg font-semibold text-foreground">
                     Keywords
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     {movie.keywords.map((kw) => (
                       <span
                         key={kw}
-                        className="rounded-full border border-border/30 bg-card/30 px-3 py-1 text-xs text-muted-foreground"
+                        className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted-foreground"
                       >
                         {kw}
                       </span>
@@ -335,14 +318,14 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
               {/* Production Companies */}
               {movie.productionCompanies.length > 0 && (
                 <div>
-                  <h3 className="font-heading text-lg font-semibold text-foreground mb-3">
+                  <h3 className="mb-3 text-lg font-semibold text-foreground">
                     Production
                   </h3>
                   <div className="flex flex-wrap gap-4">
                     {movie.productionCompanies.map((company) => (
                       <div
                         key={company.id}
-                        className="flex items-center gap-2 rounded-lg border border-border/30 bg-card/30 px-3 py-2"
+                        className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2"
                       >
                         {company.logoUrl ? (
                           <Image
@@ -367,6 +350,9 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
           {activeTab === "cast" && (
             <motion.div
               key="cast"
+              role="tabpanel"
+              id="panel-cast"
+              aria-labelledby="tab-cast"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
@@ -375,7 +361,7 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
                 {movie.cast.map((member) => (
                   <div
                     key={`${member.id}-${member.character}`}
-                    className="group flex flex-col items-center text-center rounded-xl border border-border/30 bg-card/30 p-4 transition-colors hover:border-amber-500/20"
+                    className="group fc-card flex flex-col items-center p-4 text-center transition-colors hover:border-brand-violet/30"
                   >
                     <div className="relative h-20 w-20 overflow-hidden rounded-full bg-muted/30 mb-3">
                       {member.profileUrl ? (
@@ -387,7 +373,7 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
                           sizes="80px"
                         />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center text-lg font-heading font-semibold text-muted-foreground">
+                        <div className="flex h-full w-full items-center justify-center text-lg font-semibold text-muted-foreground">
                           {member.name.charAt(0)}
                         </div>
                       )}
@@ -405,14 +391,14 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
               {/* Crew */}
               {movie.crew.length > 0 && (
                 <div className="mt-8">
-                  <h3 className="font-heading text-lg font-semibold text-foreground mb-4">
+                  <h3 className="mb-4 text-lg font-semibold text-foreground">
                     Key Crew
                   </h3>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                     {movie.crew.map((member, i) => (
                       <div
                         key={`${member.id}-${member.job}-${i}`}
-                        className="rounded-lg border border-border/30 bg-card/30 p-3"
+                        className="rounded-lg border border-border bg-surface p-3"
                       >
                         <p className="text-sm font-medium text-foreground">
                           {member.name}
@@ -431,6 +417,9 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
           {activeTab === "reviews" && (
             <motion.div
               key="reviews"
+              role="tabpanel"
+              id="panel-reviews"
+              aria-labelledby="tab-reviews"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
@@ -444,10 +433,10 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
                 movie.reviews.map((review) => (
                   <div
                     key={review.id}
-                    className="rounded-xl border border-border/30 bg-card/30 p-5"
+                    className="fc-card p-5"
                   >
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="h-9 w-9 rounded-full bg-muted/50 flex items-center justify-center text-sm font-heading font-semibold text-foreground overflow-hidden">
+                      <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-muted/50 text-sm font-semibold text-foreground">
                         {review.authorAvatar ? (
                           <Image
                             src={review.authorAvatar}
@@ -472,7 +461,7 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
                         <div className="ml-auto flex items-center gap-1">
                           <Star
                             size={12}
-                            className="fill-amber-400 text-amber-400"
+                            className="fill-brand-mint text-brand-mint"
                           />
                           <span className="text-sm font-semibold text-foreground">
                             {review.authorRating}
@@ -492,6 +481,9 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
           {activeTab === "similar" && (
             <motion.div
               key="similar"
+              role="tabpanel"
+              id="panel-similar"
+              aria-labelledby="tab-similar"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
@@ -499,7 +491,7 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
             >
               {movie.similarMovies.length > 0 && (
                 <div>
-                  <h3 className="font-heading text-lg font-semibold text-foreground mb-4">
+                  <h3 className="mb-4 text-lg font-semibold text-foreground">
                     Similar Movies
                   </h3>
                   <MovieCarousel movies={movie.similarMovies} />
@@ -507,7 +499,7 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
               )}
               {movie.recommendations.length > 0 && (
                 <div>
-                  <h3 className="font-heading text-lg font-semibold text-foreground mb-4">
+                  <h3 className="mb-4 text-lg font-semibold text-foreground">
                     Recommended For You
                   </h3>
                   <MovieCarousel movies={movie.recommendations} />
@@ -526,26 +518,10 @@ export function MovieDetailContent({ movie }: MovieDetailContentProps) {
 
       {/* Trailer Modal */}
       {showTrailer && movie.trailer && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
-          onClick={() => setShowTrailer(false)}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="relative w-full max-w-4xl aspect-video rounded-2xl overflow-hidden shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <iframe
-              src={`https://www.youtube.com/embed/${movie.trailer.key}?autoplay=1&rel=0`}
-              title={movie.trailer.name}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="h-full w-full"
-            />
-          </motion.div>
-        </div>
+        <MovieTrailerModal
+          trailer={movie.trailer}
+          onClose={() => setShowTrailer(false)}
+        />
       )}
     </div>
   );

@@ -1,9 +1,9 @@
 import type { MetadataRoute } from "next";
 import { GENRES } from "@/types/movie";
+import { clientEnv } from "@/lib/env";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const baseUrl = clientEnv.NEXT_PUBLIC_APP_URL;
 
   const staticRoutes: MetadataRoute.Sitemap = [
     {
@@ -19,15 +19,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.9,
     },
     {
+      url: `${baseUrl}/gems`,
+      lastModified: new Date(),
+      changeFrequency: "daily",
+      priority: 0.88,
+    },
+    {
       url: `${baseUrl}/explore`,
       lastModified: new Date(),
       changeFrequency: "weekly",
-      priority: 0.85,
-    },
-    {
-      url: `${baseUrl}/dashboard`,
-      lastModified: new Date(),
-      changeFrequency: "daily",
       priority: 0.85,
     },
     {

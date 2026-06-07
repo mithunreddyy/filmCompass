@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { cacheGet, cacheSet, CACHE_TTL } from "@/lib/redis-cache";
+import { getServerEnv } from "@/lib/env";
 import { ExternalApiError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 
@@ -58,7 +59,7 @@ export interface OMDbEnrichment {
 }
 
 function getApiKey(): string | null {
-  return process.env.OMDB_API_KEY ?? null;
+  return getServerEnv().OMDB_API_KEY ?? null;
 }
 
 function parseRating(value: string | undefined): number | null {

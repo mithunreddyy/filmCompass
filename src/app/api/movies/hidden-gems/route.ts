@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getHiddenGems } from "@/services/tmdb";
-import { toErrorResponse } from "@/lib/errors";
+import { apiError, apiSuccess } from "@/lib/api-route";
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,14 +10,13 @@ export async function GET(request: NextRequest) {
     );
     const result = await getHiddenGems(page);
 
-    return Response.json({
-      success: true,
+    return apiSuccess({
       data: result.movies,
       page: result.page,
       totalPages: result.totalPages,
       totalResults: result.totalResults,
     });
   } catch (error) {
-    return Response.json(toErrorResponse(error), { status: 500 });
+    return apiError(error, "Hidden gems API");
   }
 }

@@ -1,0 +1,352 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  profile       Profile?
+  accounts      Account[]
+  sessions      Session[]
+  reviews       MovieReview[]
+  watchlists    Watchlist[]
+  favorites     Favorite[]
+  collections   Collection[]
+  followers     Follow[]      @relation("Following")
+  following     Follow[]      @relation("Followers")
+  notifications Notification[]
+  searchHistory SearchHistory[]
+  activityLogs  ActivityLog[]
+  ratings       MovieRating[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Profile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  bio         String?
+  favoriteGenres String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+model Movie {
+  id           Int      @id
+  title        String
+  originalTitle String?
+  overview     String?  @db.Text
+  posterUrl    String?
+  backdropUrl  String?
+  releaseDate  String?
+  year         Int?
+  rating       Float    @default(0)
+  voteCount    Int      @default(0)
+  popularity   Float    @default(0)
+  language     String?
+  imdbId       String?  @unique
+  runtime      Int?
+  budget       BigInt?
+  revenue      BigInt?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  genres       MovieGenre[]
+  languages    MovieLanguage[]
+  cast         MovieCast[]
+  crew         MovieCrew[]
+  ratings      MovieRating[]
+  reviews      MovieReview[]
+  watchlists   Watchlist[]
+  favorites    Favorite[]
+  collections  CollectionMovie[]
+  recommendations Recommendation[]
+
+  @@map("movies")
+}
+
+model Genre {
+  id   Int    @id
+  name String
+  slug String @unique
+
+  movies MovieGenre[]
+
+  @@map("genres")
+}
+
+model MovieGenre {
+  movieId Int
+  genreId Int
+
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([movieId, genreId])
+  @@map("movie_genres")
+}
+
+model Language {
+  code String @id
+  name String
+
+  movies MovieLanguage[]
+
+  @@map("languages")
+}
+
+model MovieLanguage {
+  movieId      Int
+  languageCode String
+
+  movie    Movie    @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  language Language @relation(fields: [languageCode], references: [code], onDelete: Cascade)
+
+  @@id([movieId, languageCode])
+  @@map("movie_languages")
+}
+
+model Actor {
+  id          Int     @id
+  name        String
+  profileUrl  String?
+
+  castRoles MovieCast[]
+
+  @@map("actors")
+}
+
+model Director {
+  id         Int     @id
+  name       String
+  profileUrl String?
+
+  @@map("directors")
+}
+
+model MovieCast {
+  movieId   Int
+  actorId   Int
+  character String
+  order     Int     @default(0)
+
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  actor Actor @relation(fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@id([movieId, actorId, character])
+  @@map("movie_cast")
+}
+
+model MovieCrew {
+  movieId    Int
+  personId   Int
+  name       String
+  job        String
+  department String
+
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@id([movieId, personId, job])
+  @@map("movie_crew")
+}
+
+model MovieRating {
+  id        String   @id @default(cuid())
+  userId    String
+  movieId   Int
+  score     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+  @@map("movie_ratings")
+}
+
+model MovieReview {
+  id        String   @id @default(cuid())
+  userId    String
+  movieId   Int
+  content   String   @db.Text
+  rating    Float?
+  likes     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@map("movie_reviews")
+}
+
+model Watchlist {
+  id        String   @id @default(cuid())
+  userId    String
+  movieId   Int
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+  @@map("watchlists")
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  movieId   Int
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+  @@map("favorites")
+}
+
+model Collection {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String?  @db.Text
+  isPublic    Boolean  @default(true)
+  slug        String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movies CollectionMovie[]
+
+  @@map("collections")
+}
+
+model CollectionMovie {
+  collectionId String
+  movieId      Int
+  order        Int      @default(0)
+  addedAt      DateTime @default(now())
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  movie      Movie      @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, movieId])
+  @@map("collection_movies")
+}
+
+model Follow {
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("Followers", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@map("followers")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model SearchHistory {
+  id        String   @id @default(cuid())
+  userId    String?
+  query     String
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("search_history")
+}
+
+model Recommendation {
+  id        String   @id @default(cuid())
+  userId    String?
+  movieId   Int
+  reason    String
+  score     Float    @default(0)
+  createdAt DateTime @default(now())
+
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@map("recommendations")
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("activity_logs")
+}

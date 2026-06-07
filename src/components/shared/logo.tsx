@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { Compass } from "lucide-react";
+import { BrandMark } from "@/components/shared/brand-mark";
 import { cn } from "@/lib/utils";
 
 export function Logo({ size = "default" }: { size?: "small" | "default" | "large" }) {
-  const iconSizes = { small: 15, default: 18, large: 22 };
+  const markSizes = { small: 28, default: 36, large: 40 };
   const textSizes = {
     small: "text-sm",
     default: "text-base",
@@ -14,16 +14,15 @@ export function Logo({ size = "default" }: { size?: "small" | "default" | "large
     <Link href="/" className="group flex shrink-0 items-center gap-2 no-underline">
       <span
         className={cn(
-          "relative flex items-center justify-center rounded-xl bg-gradient-to-br from-brand-violet/25 to-brand-mint/10 ring-1 ring-brand-violet/35 shadow-[0_0_20px_rgba(139,124,246,0.12)] transition-all group-hover:ring-brand-violet/55 group-hover:shadow-[0_0_24px_rgba(139,124,246,0.2)]",
+          "relative flex items-center justify-center rounded-xl transition-all duration-300 group-hover:shadow-[0_0_24px_rgba(139,124,246,0.28)] group-hover:scale-[1.03]",
           size === "small" && "h-7 w-7",
           size === "default" && "h-9 w-9",
           size === "large" && "h-10 w-10"
         )}
       >
-        <Compass
-          size={iconSizes[size]}
-          className="text-brand-violet transition-transform duration-500 group-hover:rotate-45"
-          strokeWidth={2}
+        <BrandMark
+          size={markSizes[size]}
+          className="rounded-xl shadow-[0_0_20px_rgba(139,124,246,0.15)]"
         />
       </span>
       <span className="hidden sm:block">
